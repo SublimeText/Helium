@@ -1,0 +1,5 @@
+The whole Hermes package is licensed under GNU GENERAL PUBLIC LICENSE Version 2.
+YEAR: 2016
+COPYRIGHT HOLDER: NEGORO Tetsuya
+
+A part of this package is taken over from SublimeREPL package by Wojciech Bederski, which is licensed under GPL2.
