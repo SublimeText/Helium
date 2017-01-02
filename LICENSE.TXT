@@ -2,4 +2,12 @@ The whole Hermes package is licensed under GNU GENERAL PUBLIC LICENSE Version 2.
 YEAR: 2016
 COPYRIGHT HOLDER: NEGORO Tetsuya
 
-A part of this package is taken over from SublimeREPL package by Wojciech Bederski, which is licensed under GPL2.
+Portions of this package are taken over from SublimeREPL package by Wojciech Bederski, which is licensed under GPL2.
+The files below are based on those taken over from the packages are below:
+
+  - hermes.py
+  - lib/repl.py
+  - lib/sublimerepl_build_system_hack.py
+  - lib/sublimerepl_build_system_hack.sublime-build
+
+ Substantializing input history depends on buzhug library by Pierre Quentel. (http://buzhug.sourceforge.net/ buzhug is published under the revised BSD licence. The code for it is `lib/PyDbLite.py`.
