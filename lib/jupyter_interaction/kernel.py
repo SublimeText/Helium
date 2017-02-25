@@ -10,12 +10,12 @@ All rights are reserved.
 from threading import Thread
 from queue import Queue
 from urllib.parse import quote
-import requests
 import json
 from websocket import create_connection
 from uuid import uuid4
 from datetime import datetime
 
+import sublime
 
 JUPYTER_PROTOCOL_VERSION = '5.0'
 
@@ -35,10 +35,10 @@ def extract_content(messages, msg_type):
         if message['header']['msg_type'] == msg_type]
 
 
-def extract_data_if_text(execute_result_content):
+def extract_data(result):
     """Extract plain text data."""
     try:
-        return execute_result_content['data']['text/plain']
+        return result['data']
     except KeyError:
         return ""
 
@@ -57,10 +57,14 @@ class Kernel(object):
 
         def run(self):
             """Main routine."""
+            # TODO: log
             while True:
-                message, callback = self.message_queue.get()
-                reply = self._kernel._communicate(message)
-                callback(reply)
+                try:
+                    message, callback = self.message_queue.get()
+                    reply = self._kernel._communicate(message)
+                    callback(reply)
+                except Exception as err:
+                    print(err)
 
     def __init__(
         self,
@@ -79,10 +83,13 @@ class Kernel(object):
         self._kernel_id = kernel_id
         self.manager = manager
         self._ws_url = '{base_ws_url}/api/kernels/{kernel_id}/channels'.format(
-            base_ws_url=manager.base_ws_url,
+            base_ws_url=manager.base_ws_url(),
             kernel_id=quote(kernel_id))
-        self._communicator = Kernel.AsyncCommunicator(self)
-        self._communicator.start()
+        self._async_communicator = Kernel.AsyncCommunicator(self)
+        self._async_communicator.start()
+        self._run_commands = {
+            "text/plain": self._output_to_view
+        }
 
     @property
     def lang(self):
@@ -93,6 +100,13 @@ class Kernel(object):
     def kernel_id(self):
         """ID of kernel."""
         return self._kernel_id
+
+    @property
+    def view_name(self):
+        """The name of output view."""
+        return "*Hermes Output* [{lang}] {kernel_id}".format(
+            lang=self.lang,
+            kernel_id=self.kernel_id)
 
     def _communicate(self, message):
         """Send `message` to the kernel and return `reply` for it."""
@@ -107,7 +121,7 @@ class Kernel(object):
         return replies
 
     def _async_communicate(self, message, callback):
-        self._communicator.message_queue.put((message, callback))
+        self._async_communicator.message_queue.put((message, callback))
 
     def _gen_header(self, msg_type):
         return dict(
@@ -118,14 +132,45 @@ class Kernel(object):
             msg_type=msg_type
         )
 
-    def run_code(self, code):
+    def activate_view(self):
+        """Activate view to show the output of Kernel."""
+        view = self.get_view()
+        sublime.active_window().focus_view(view)
+        view.set_scratch(True)  # avoids prompting to save
+        view.settings().set("word_wrap", "false")
+
+    def _output_to_view(self, content):
+        view = self.get_view()
+        view.set_read_only(False)
+        view.run_command('append', {'characters': content})
+        view.set_read_only(True)
+
+    def get_view(self):
+        """Get view corresponds to the kernel."""
+        view = None
+        view_name = self.view_name
+        views = sublime.active_window().views()
+        for view_candidate in views:
+            if view_candidate.name() == view_name:
+                return view_candidate
+        if not view:
+            view = sublime.active_window().new_file()
+            view.set_name(view_name)
+            return view
+
+    def execute_code(self, code):
         """Run code with Jupyter kernel."""
         def callback(reply):
-            result, = extract_content(
+            content = extract_content(
                 reply,
                 MSG_TYPE_EXECUTE_RESULT)
-            data = extract_data_if_text(result)
-            self._show_result(data)
+            if len(content) == 0:
+                return
+            result, = content
+            data = extract_data(result)
+            for mime_type in data:
+                if mime_type in self._run_commands:
+                    self._run_commands[mime_type](data[mime_type])
 
         header = self._gen_header(MSG_TYPE_EXECUTE_REQUEST)
         content = dict(
@@ -163,50 +208,3 @@ class Kernel(object):
         reply = self._communicate(message)
         content, = extract_content(reply, MSG_TYPE_COMPLETE_REPLY)
         return content["matches"]
-
-
-class KernelManager(object):
-    """Manage Jupyter kernels."""
-
-    def __init__(
-        self,
-        base_url,
-        base_ws_url=None,
-    ):
-        """Initialize a kernel manager.
-
-        TODO: Deal with authentication.
-        """
-        if base_ws_url is None:
-            _, _, url_body = base_url.partition("://")
-            base_ws_url = "ws://" + url_body
-        self._base_url = base_url
-        self._base_ws_url = base_ws_url
-
-    @property
-    def base_url(self):
-        """Base url of the jupyter process."""
-        return self._base_url
-
-    @property
-    def base_ws_url(self):
-        """Base WebSocket URL of the jupyter process."""
-        return self._base_ws_url
-
-    def get_jupyter_kernel_list(self):
-        """Get the list of kernels."""
-        url = '{}/api/kernels'.format(self.base_url)
-        response = requests.get(url)
-        return response.json()
-
-    def start_kernel(self, lang):
-        """Start kernel and return a `Kernel` instance."""
-        url = '{}/api/kernels'.format(self.base_url)
-        data = dict(name=lang)
-        response = requests.post(
-            url,
-            data=json.dumps(data)).json()
-        return Kernel(
-            lang=response["name"],
-            kernel_id=response["id"],
-            manager=self)

@@ -1,0 +1,14 @@
+[
+  {
+    "caption": "Hermes: Connect Kernel",
+    "command": "hermes_connect_kernel"
+  },
+  {
+    "caption": "Hermes: Set URL",
+    "command": "hermes_set_url"
+  },
+  {
+    "caption": "Hermes: Execute Block",
+    "command": "hermes_execute_block"
+  }
+]
