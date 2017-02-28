@@ -100,6 +100,13 @@ class KernelManager(object):
         return cls._base_ws_url
 
     @classmethod
+    def list_kernelspecs(cls):
+        """Get the kernelspecs."""
+        url = '{}/api/kernelspecs'.format(cls.base_url())
+        response = requests.get(url)
+        return response.json()
+
+    @classmethod
     def list_kernels(cls):
         """Get the list of kernels."""
         url = '{}/api/kernels'.format(cls.base_url())
@@ -107,20 +114,20 @@ class KernelManager(object):
         return response.json()
 
     @classmethod
-    def get_kernel(cls, lang, kernel_id):
+    def get_kernel(cls, name, kernel_id):
         """Get Kernel object."""
-        if (lang, kernel_id) in cls.kernels:
-            return cls.kernels[(lang, kernel_id)]
+        if (name, kernel_id) in cls.kernels:
+            return cls.kernels[(name, kernel_id)]
         else:
-            kernel = Kernel(lang, kernel_id, cls)
-            cls.kernels[(lang, kernel_id)] = kernel
+            kernel = Kernel(name, kernel_id, cls)
+            cls.kernels[(name, kernel_id)] = kernel
             return kernel
 
     @classmethod
-    def _start_kernel(cls, lang):
+    def _start_kernel(cls, name):
         """Start kernel and return a `Kernel` instance."""
         url = '{}/api/kernels'.format(cls.base_url())
-        data = dict(name=lang)
+        data = dict(name=name)
         response = requests.post(
             url,
             data=json.dumps(data)).json()
@@ -157,7 +164,7 @@ class HermesConnectKernel(TextCommand):
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command."""
         try:
-            # TODO: チェックする用のメソッドを決める。
+            # TODO: Implement a function to list kernels.
             kernel_list = KernelManager.list_kernels()
         except:
             sublime.message_dialog("Set URL first, please.")
