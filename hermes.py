@@ -10,7 +10,7 @@ from logging import getLogger, INFO, StreamHandler
 
 import sublime
 from sublime_plugin import WindowCommand, TextCommand, EventListener
-from .kernel import Kernel
+from .kernel import KernelConnection
 
 import requests
 
@@ -54,7 +54,7 @@ class ViewManager(object):
             del cls.view_kernel_table[view_name]
 
     @classmethod
-    def get_kernel_for_view(cls, buffer_id) -> Kernel:
+    def get_kernel_for_view(cls, buffer_id) -> KernelConnection:
         """Get Kernel instance corresponding to the buffer_id."""
         return cls.view_kernel_table[buffer_id]
 
@@ -115,23 +115,23 @@ class KernelManager(object):
 
     @classmethod
     def get_kernel(cls, name, kernel_id):
-        """Get Kernel object."""
+        """Get KernelConnection object."""
         if (name, kernel_id) in cls.kernels:
             return cls.kernels[(name, kernel_id)]
         else:
-            kernel = Kernel(name, kernel_id, cls)
+            kernel = KernelConnection(name, kernel_id, cls)
             cls.kernels[(name, kernel_id)] = kernel
             return kernel
 
     @classmethod
-    def _start_kernel(cls, name):
+    def start_kernel(cls, name):
         """Start kernel and return a `Kernel` instance."""
         url = '{}/api/kernels'.format(cls.base_url())
         data = dict(name=name)
         response = requests.post(
             url,
             data=json.dumps(data)).json()
-        return Kernel(
+        return KernelConnection(
             lang=response["name"],
             kernel_id=response["id"],
             manager=cls)
@@ -158,19 +158,54 @@ class HermesSetUrl(WindowCommand):
             connection_list, callback)
 
 
+class HermesStartKernel(TextCommand):
+    """Start a kernel and connect view to it."""
+
+    def run(self, edit, *, logger=HERMES_LOGGER):
+        """Command definition."""
+        try:
+            kernelspecs = KernelManager.list_kernelspecs()
+        except:
+            sublime.message_dialog("Set URL first, please.")
+            sublime.active_window().run_command("hermes_set_url")
+            return
+        menu_items = list(kernelspecs["kernelspecs"].keys())
+
+        def callback(index):
+            selected_kernelspec = menu_items[index]
+            kernel = KernelManager.start_kernel(selected_kernelspec)
+            ViewManager.connect_kernel(
+                self.view.buffer_id(),
+                kernel.lang,
+                kernel.kernel_id)
+            if self.view.file_name():
+                view_name = self.view.file_name()
+            else:
+                view_name = self.view.name()
+            log_info_msg = (
+                "Connected view '{view_name}(id: {buffer_id})'"
+                "to kernel {kernel_id}.").format(
+                view_name=view_name,
+                buffer_id=self.view.buffer_id(),
+                kernel_id=kernel.kernel_id)
+            logger.info(log_info_msg)
+
+        sublime.active_window().show_quick_panel(
+            menu_items, callback)
+
+
 class HermesConnectKernel(TextCommand):
     """Set url of jupyter process."""
 
     def run(self, edit, *, logger=HERMES_LOGGER):
-        """Command."""
+        """Command definition."""
         try:
-            # TODO: Implement a function to list kernels.
             kernel_list = KernelManager.list_kernels()
         except:
             sublime.message_dialog("Set URL first, please.")
             sublime.active_window().run_command("hermes_set_url")
             return
-        kernel_list_menu_items = [
+        menu_items = [
             "[{lang}] {kernel_id}".format(
                 lang=kernel["name"],
                 kernel_id=kernel["id"])
@@ -178,6 +213,9 @@ class HermesConnectKernel(TextCommand):
             in kernel_list]
 
         def callback(index):
+            if index == len(kernel_list):
+                self.view.run_command("hermes_start_kernel")
+                return
             selected_kernel = kernel_list[index]
             ViewManager.connect_kernel(
                 self.view.buffer_id(),
@@ -194,9 +232,9 @@ class HermesConnectKernel(TextCommand):
                 buffer_id=self.view.buffer_id(),
                 kernel_id=selected_kernel["id"])
             logger.info(log_info_msg)
-        # kernel_list = ["Start new kernel."] + kernel_list
+        menu_items += ["New kernel"]
         sublime.active_window().show_quick_panel(
-            kernel_list_menu_items, callback)
+            menu_items, callback)
 
 
 def get_line(view: sublime.View, row: int) -> str:
@@ -290,4 +328,3 @@ class HermesCompleter(EventListener):
                 in kernel.get_complete(prefix, len(prefix))]
         except KeyError:
             pass
->>>>>>> a5e21b7... Implemented autocomplete provider.

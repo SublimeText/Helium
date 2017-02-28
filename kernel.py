@@ -1,6 +1,6 @@
-"""Definition of Kernel class.
+"""Definition of KernelConnection class.
 
-Kernel class provides interaction with Jupyter kernels.
+KernelConnection class provides interaction with Jupyter kernels.
 
 by NEGORO Tetsuya, 2017
 This code is under GPL2 License.
@@ -43,7 +43,7 @@ def extract_data(result):
         return ""
 
 
-class Kernel(object):
+class KernelConnection(object):
     """Interact with a Jupyter kernel."""
 
     class AsyncCommunicator(Thread):
@@ -51,7 +51,7 @@ class Kernel(object):
 
         def __init__(self, kernel):
             """Initialize AsyncCommunicator class."""
-            super(Kernel.AsyncCommunicator, self).__init__()
+            super(KernelConnection.AsyncCommunicator, self).__init__()
             self._kernel = kernel
             self.message_queue = Queue()
 
@@ -76,7 +76,7 @@ class Kernel(object):
             .load_settings("Hermes.sublime-settings")
             .get("max_shown_input_length"))
     ):
-        """Initialize Kernel class.
+        """Initialize KernelConnection class.
 
         paramters
         ---------
@@ -89,7 +89,7 @@ class Kernel(object):
         self._ws_url = '{base_ws_url}/api/kernels/{kernel_id}/channels'.format(
             base_ws_url=manager.base_ws_url(),
             kernel_id=quote(kernel_id))
-        self._async_communicator = Kernel.AsyncCommunicator(self)
+        self._async_communicator = KernelConnection.AsyncCommunicator(self)
         self._async_communicator.start()
         self._run_commands = {
             "text/plain": self._output_to_view
@@ -138,7 +138,7 @@ class Kernel(object):
         )
 
     def activate_view(self):
-        """Activate view to show the output of Kernel."""
+        """Activate view to show the output of kernel."""
         view = self.get_view()
         sublime.active_window().focus_view(view)
         view.set_scratch(True)  # avoids prompting to save
@@ -159,7 +159,7 @@ class Kernel(object):
         view.set_read_only(True)
 
     def get_view(self):
-        """Get view corresponds to the kernel."""
+        """Get view corresponds to the KernelConnection."""
         view = None
         view_name = self.view_name
         views = sublime.active_window().views()
