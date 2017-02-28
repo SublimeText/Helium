@@ -70,7 +70,11 @@ class Kernel(object):
         self,
         lang,
         kernel_id,
-        manager
+        manager,
+        max_shown_input_length=(
+            sublime
+            .load_settings("Hermes.sublime-settings")
+            .get("max_shown_input_length"))
     ):
         """Initialize Kernel class.
 
@@ -90,6 +94,7 @@ class Kernel(object):
         self._run_commands = {
             "text/plain": self._output_to_view
         }
+        self._max_shown_input_length = max_shown_input_length
 
     @property
     def lang(self):
@@ -139,11 +144,17 @@ class Kernel(object):
         view.set_scratch(True)  # avoids prompting to save
         view.settings().set("word_wrap", "false")
 
-    def _output_to_view(self, content):
+    def _output_to_view(self, code: str, result: str) -> None:
         view = self.get_view()
         view.set_read_only(False)
-        # TODO: OS dependent new line
-        view.run_command('append', {'characters': content + '\n'})
+        if len(code) > self._max_shown_input_length:
+            # Truncate if input if too long.
+            # Truncation of the output should be each kernel's deal.
+            code = code[:self._max_shown_input_length] + "..."
+        for line in ["Input:", code, "Output:", result, "---", "\n"]:
+            view.run_command(
+                'append',
+                {'characters': line + "\n"})
         view.set_read_only(True)
 
     def get_view(self):
@@ -171,7 +182,9 @@ class Kernel(object):
             data = extract_data(result)
             for mime_type in data:
                 if mime_type in self._run_commands:
-                    self._run_commands[mime_type](data[mime_type])
+                    self._run_commands[mime_type](
+                        code,
+                        data[mime_type])
 
         header = self._gen_header(MSG_TYPE_EXECUTE_REQUEST)
         content = dict(
