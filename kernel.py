@@ -142,7 +142,8 @@ class Kernel(object):
     def _output_to_view(self, content):
         view = self.get_view()
         view.set_read_only(False)
-        view.run_command('append', {'characters': content})
+        # TODO: OS dependent new line
+        view.run_command('append', {'characters': content + '\n'})
         view.set_read_only(True)
 
     def get_view(self):

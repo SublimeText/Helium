@@ -10,8 +10,8 @@ from logging import getLogger, INFO, StreamHandler
 
 import sublime
 from sublime_plugin import WindowCommand, TextCommand
-# , EventListener, TextCommand
-from .lib.jupyter_interaction.kernel import Kernel
+# , EventListener
+from .kernel import Kernel
 
 import requests
 
@@ -139,10 +139,10 @@ class HermesSetUrl(WindowCommand):
         """Command."""
         # TODO: read from config file
         connection_list = ["http://localhost:8888"]
-        connection_list = ["Input url"] + connection_list
+        connection_list += ["Input url"]
 
         def callback(index):
-            if index == 0:
+            if index == len(connection_list):
                 sublime.active_window().show_input_panel(
                     'URL: ', '', KernelManager.set_url, None, None)
             else:
@@ -159,11 +159,11 @@ class HermesConnectKernel(TextCommand):
         """Command."""
         try:
             # TODO: チェックする用のメソッドを決める。
-            KernelManager.list_kernels()
+            kernel_list = KernelManager.list_kernels()
         except:
-            # sublime.active_window().run_command("hermes_set_url")
-            HermesSetUrl.run()
-        kernel_list = KernelManager.list_kernels()
+            sublime.message_dialog("Set URL first, please.")
+            sublime.active_window().run_command("hermes_set_url")
+            return
         kernel_list_menu_items = [
             "[{lang}] {kernel_id}".format(
                 lang=kernel["name"],
@@ -247,7 +247,11 @@ class HermesExecuteBlock(TextCommand):
     """Execute code."""
 
     def run(self, edit, *, logger=HERMES_LOGGER):
-        kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
+        try:
+            kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
+        except:
+            sublime.message_dialog("No kernel is connected to this view.")
+            self.view.run_command("hermes_connect_kernel")
         pre_code = []
         for s in self.view.sel():
             code = get_block(self.view, s)
