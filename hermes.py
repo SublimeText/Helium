@@ -9,8 +9,7 @@ import re
 from logging import getLogger, INFO, StreamHandler
 
 import sublime
-from sublime_plugin import WindowCommand, TextCommand
-# , EventListener
+from sublime_plugin import WindowCommand, TextCommand, EventListener
 from .kernel import Kernel
 
 import requests
@@ -55,7 +54,7 @@ class ViewManager(object):
             del cls.view_kernel_table[view_name]
 
     @classmethod
-    def get_kernel_for_view(cls, buffer_id):
+    def get_kernel_for_view(cls, buffer_id) -> Kernel:
         """Get Kernel instance corresponding to the buffer_id."""
         return cls.view_kernel_table[buffer_id]
 
@@ -247,6 +246,7 @@ class HermesExecuteBlock(TextCommand):
     """Execute code."""
 
     def run(self, edit, *, logger=HERMES_LOGGER):
+        """Command definition."""
         try:
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except:
@@ -263,3 +263,24 @@ class HermesExecuteBlock(TextCommand):
                 kernel_id=kernel.kernel_id)
             logger.info(log_info_msg)
             pre_code = code
+
+
+class HermesCompleter(EventListener):
+    """Completer."""
+
+    def on_query_completions(
+        self, view, prefix, locations, *,
+        logger=HERMES_LOGGER
+    ):
+        """Get completions from the jupyter kernel."""
+        try:
+            # TODO: provide the way to toggle completion from the package.
+            # TODO: It's better to get code from buffer, not prefix.
+            kernel = ViewManager.get_kernel_for_view(view.buffer_id())
+            return [
+                (completion, ) * 2
+                for completion
+                in kernel.get_complete(prefix, len(prefix))]
+        except KeyError:
+            pass
+>>>>>>> a5e21b7... Implemented autocomplete provider.

@@ -145,6 +145,7 @@ class Kernel(object):
         view.settings().set("word_wrap", "false")
 
     def _output_to_view(self, code: str, result: str) -> None:
+        self.activate_view()
         view = self.get_view()
         view.set_read_only(False)
         if len(code) > self._max_shown_input_length:
