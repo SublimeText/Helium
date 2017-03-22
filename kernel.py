@@ -24,6 +24,7 @@ MSG_TYPE_EXECUTE_RESULT = 'execute_result'
 MSG_TYPE_EXECUTE_REPLY = 'execute_reply'
 MSG_TYPE_COMPLETE_REQUEST = 'complete_request'
 MSG_TYPE_COMPLETE_REPLY = 'complete_reply'
+MSG_TYPE_DISPLAY_DATA = 'display_data'
 
 
 def extract_content(messages, msg_type):
@@ -74,7 +75,9 @@ class KernelConnection(object):
         max_shown_input_length=(
             sublime
             .load_settings("Hermes.sublime-settings")
-            .get("max_shown_input_length"))
+            .get("max_shown_input_length")),
+        *,
+        logger=None
     ):
         """Initialize KernelConnection class.
 
@@ -91,10 +94,14 @@ class KernelConnection(object):
             kernel_id=quote(kernel_id))
         self._async_communicator = KernelConnection.AsyncCommunicator(self)
         self._async_communicator.start()
+        self._handle_display_data = {
+            "image/png": self._handle_png_display_data
+        }
         self._run_commands = {
-            "text/plain": self._output_to_view
+            "text/plain": self._handle_text
         }
         self._max_shown_input_length = max_shown_input_length
+        self._logger = logger
 
     @property
     def lang(self):
@@ -144,18 +151,31 @@ class KernelConnection(object):
         view.set_scratch(True)  # avoids prompting to save
         view.settings().set("word_wrap", "false")
 
-    def _output_to_view(self, code: str, result: str) -> None:
+    def _handle_png_display_data(self, data: bytes) -> None:
+        import base64
+        import tempfile
+        decoded = base64.b64decode(data)
+        with tempfile.TemporaryFile(delete=False, suffix=".png") as out_file:
+            out_file.write(decoded)
+            view_output = "Saved the figure to '{out_file}'.\n".format(
+                out_file=out_file.name)
+            self._write_to_view(view_output)
+
+    def _handle_text(self, code: str, result: str) -> None:
+        if len(code) > self._max_shown_input_length:
+            # truncate if input if too long.
+            # truncation of the output should be each kernel's deal.
+            code = code[:self._max_shown_input_length] + "..."
+        for line in ["input:", code, "output:", result, "---", "\n"]:
+            self._write_to_view(line + "\n")
+
+    def _write_to_view(self, text: str) -> None:
         self.activate_view()
         view = self.get_view()
         view.set_read_only(False)
-        if len(code) > self._max_shown_input_length:
-            # Truncate if input if too long.
-            # Truncation of the output should be each kernel's deal.
-            code = code[:self._max_shown_input_length] + "..."
-        for line in ["Input:", code, "Output:", result, "---", "\n"]:
-            view.run_command(
-                'append',
-                {'characters': line + "\n"})
+        view.run_command(
+            'append',
+            {'characters': text})
         view.set_read_only(True)
 
     def get_view(self):
@@ -174,18 +194,32 @@ class KernelConnection(object):
     def execute_code(self, code):
         """Run code with Jupyter kernel."""
         def callback(reply):
-            content = extract_content(
+            display_contents = extract_content(
+                reply,
+                MSG_TYPE_DISPLAY_DATA)
+            for display_content in display_contents:
+                display_data = extract_data(display_content)
+                for mime_type in display_data:
+                    try:
+                        self._handle_display_data[mime_type](
+                            display_data[mime_type])
+                    except KeyError:
+                        pass
+            result_content = extract_content(
                 reply,
                 MSG_TYPE_EXECUTE_RESULT)
-            if len(content) == 0:
+            if len(result_content) == 0:
                 return
-            result, = content
+            result, = result_content
             data = extract_data(result)
             for mime_type in data:
                 if mime_type in self._run_commands:
-                    self._run_commands[mime_type](
-                        code,
-                        data[mime_type])
+                    try:
+                        self._run_commands[mime_type](
+                            code,
+                            data[mime_type])
+                    except KeyError:
+                        pass
 
         header = self._gen_header(MSG_TYPE_EXECUTE_REQUEST)
         content = dict(
