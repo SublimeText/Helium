@@ -1,3 +1,18 @@
-The whole Hermes package is licensed under GNU GENERAL PUBLIC LICENSE Version 2.
+Hermes package is licensed under GNU GENERAL PUBLIC LICENSE Version 2.
 YEAR: 2016
 COPYRIGHT HOLDER: NEGORO Tetsuya
+
+This package includes libraries below.
+
+  - six
+  - websocket-client
+  - Requests
+
+Six is licensed under MIT license.
+Copyright (c) 2010-2017 Benjamin Peterson
+
+websocket-client is licensed under GNU Lesser General Public License v3.0.
+
+
+Requests is licensed under Apache License, Version 2.0.
+Copyright 2017 Kenneth Reitz
