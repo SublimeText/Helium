@@ -119,7 +119,7 @@ class KernelManager(object):
         if (name, kernel_id) in cls.kernels:
             return cls.kernels[(name, kernel_id)]
         else:
-            kernel = KernelConnection(name, kernel_id, cls)
+            kernel = KernelConnection(name, kernel_id, cls, logger=HERMES_LOGGER)
             cls.kernels[(name, kernel_id)] = kernel
             return kernel
 

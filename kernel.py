@@ -11,6 +11,9 @@ from threading import Thread
 from queue import Queue
 from urllib.parse import quote
 import json
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
 from websocket import create_connection
 from uuid import uuid4
 from datetime import datetime
@@ -25,6 +28,8 @@ MSG_TYPE_EXECUTE_REPLY = 'execute_reply'
 MSG_TYPE_COMPLETE_REQUEST = 'complete_request'
 MSG_TYPE_COMPLETE_REPLY = 'complete_reply'
 MSG_TYPE_DISPLAY_DATA = 'display_data'
+
+HERMES_FIGURE_PHANTOMS = "hermes_figure_phantoms"
 
 
 def extract_content(messages, msg_type):
@@ -154,12 +159,19 @@ class KernelConnection(object):
     def _handle_png_display_data(self, data: bytes) -> None:
         import base64
         import tempfile
-        decoded = base64.b64decode(data)
-        with tempfile.TemporaryFile(delete=False, suffix=".png") as out_file:
-            out_file.write(decoded)
-            view_output = "Saved the figure to '{out_file}'.\n".format(
-                out_file=out_file.name)
-            self._write_to_view(view_output)
+        # decoded = base64.b64decode(data)
+        # with tempfile.TemporaryFile(delete=False, suffix=".png") as out_file:
+        #     out_file.write(decoded)
+        #     view_output = "Saved the figure to '{out_file}'.\n".format(
+        #         out_file=out_file.name)
+        #     self._write_to_view(view_output)
+        self._logger.info("Output image.")
+        content = '<img alt="Out" src="data:image/png;base64,{data}" />'.format(data=data.strip())
+        file_size = self.get_view().size()
+        region = sublime.Region(file_size, file_size)
+        phantom = sublime.Phantom(region, content, sublime.LAYOUT_BLOCK)
+        self.get_view().add_phantom(HERMES_FIGURE_PHANTOMS, region, content, sublime.LAYOUT_BLOCK)
+        self._logger.info("Created phantom {}".format(content))
 
     def _handle_text(self, code: str, result: str) -> None:
         if len(code) > self._max_shown_input_length:
@@ -198,6 +210,7 @@ class KernelConnection(object):
                 reply,
                 MSG_TYPE_DISPLAY_DATA)
             for display_content in display_contents:
+                self._logger.info("Caught display contents.")
                 display_data = extract_data(display_content)
                 for mime_type in display_data:
                     try:
@@ -236,6 +249,8 @@ class KernelConnection(object):
             metadata={},
             buffers={})
         self._async_communicate(message, callback)
+        info_message = "Kernel executed code ```{code}```.".format(code=code)
+        self._logger.info(info_message)
 
     def get_complete(self, code, cursor_pos):
         """Generate complete request."""
