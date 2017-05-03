@@ -165,7 +165,7 @@ class HermesStartKernel(TextCommand):
         """Command definition."""
         try:
             kernelspecs = KernelManager.list_kernelspecs()
-        except:
+        except requests.RequestException:
             sublime.message_dialog("Set URL first, please.")
             sublime.active_window().run_command("hermes_set_url")
             return
@@ -201,7 +201,7 @@ class HermesConnectKernel(TextCommand):
         """Command definition."""
         try:
             kernel_list = KernelManager.list_kernels()
-        except:
+        except requests.RequestException:
             sublime.message_dialog("Set URL first, please.")
             sublime.active_window().run_command("hermes_set_url")
             return
@@ -294,7 +294,7 @@ class HermesExecuteBlock(TextCommand):
         """Command definition."""
         try:
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
-        except:
+        except KeyError:
             sublime.message_dialog("No kernel is connected to this view.")
             self.view.run_command("hermes_connect_kernel")
         pre_code = []
