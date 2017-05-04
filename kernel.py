@@ -47,6 +47,41 @@ def extract_data(result):
         return ""
 
 
+class JupyterReply(object):
+    """Parse replies from Jupyter."""
+
+    def __init__(self, reply):
+        """Parse message and initialize self."""
+        display_contents = extract_content(
+            reply,
+            MSG_TYPE_DISPLAY_DATA)
+        self._display_data = [
+            extract_data(display_content)
+            for display_content
+            in display_contents]
+        result_content = extract_content(
+            reply,
+            MSG_TYPE_EXECUTE_RESULT)
+        if len(result_content) == 0:
+            return
+        result, = result_content
+        self._execute_result = extract_data(result)
+
+    @property
+    def display_data(self):
+        try:
+            return self._display_data
+        except AttributeError:
+            return [dict()]
+
+    @property
+    def execute_result(self):
+        try:
+            return self._execute_result
+        except AttributeError:
+            return dict()
+
+
 class KernelConnection(object):
     """Interact with a Jupyter kernel."""
 
@@ -204,33 +239,26 @@ class KernelConnection(object):
     def execute_code(self, code):
         """Run code with Jupyter kernel."""
         def callback(reply):
-            display_contents = extract_content(
-                reply,
-                MSG_TYPE_DISPLAY_DATA)
-            for display_content in display_contents:
-                self._logger.info("Caught display contents.")
-                display_data = extract_data(display_content)
-                for mime_type in display_data:
+            reply_obj = JupyterReply(reply)
+            for display_data in reply_obj.display_data:
+                for mime_type, data in display_data.items():
                     try:
                         self._handle_display_data[mime_type](
-                            display_data[mime_type])
-                    except KeyError:
-                        pass
-            result_content = extract_content(
-                reply,
-                MSG_TYPE_EXECUTE_RESULT)
-            if len(result_content) == 0:
-                return
-            result, = result_content
-            data = extract_data(result)
-            for mime_type in data:
-                if mime_type in self._run_commands:
-                    try:
-                        self._run_commands[mime_type](
-                            code,
                             data[mime_type])
                     except KeyError:
                         pass
+            mime_types = [
+                mime_type
+                for mime_type
+                in reply_obj.execute_result
+                if mime_type in self._run_commands]
+            for mime_type in mime_types:
+                try:
+                    self._run_commands[mime_type](
+                        code,
+                        reply_obj.execute_result[mime_type])
+                except KeyError:
+                    pass
 
         header = self._gen_header(MSG_TYPE_EXECUTE_REQUEST)
         content = dict(
