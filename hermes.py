@@ -6,6 +6,7 @@ Copyright (c) 2016, NEGORO Tetsuya (https://github.com/ngr-t)
 
 import json
 import re
+from functools import (partial, wraps)
 from logging import getLogger, INFO, StreamHandler
 
 import sublime
@@ -23,6 +24,33 @@ HERMES_LOGGER.addHandler(HANDLER)
 
 # Regex patterns to extract code lines.
 INDENT_PATTERN = re.compile(r"^([ \t]*)")
+
+
+def chain_callbacks(f):
+    # type: Callable[..., Generator[Callable[Callable[...], Any, Any]] -> Callable[..., Any]
+    """Decorator to enable mimicing promise pattern by yield expression.
+
+    Decorator function to make a wrapper which executes functions
+    yielded by the given generator in order."""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        chain = f(*args, **kwargs)
+        try:
+            next_f = next(chain)
+        except StopIteration:
+            return
+
+        def cb(*args, **kwargs):
+            nonlocal next_f
+            try:
+                if len(args) + len(kwargs) != 0:
+                    chain.send(*args, **kwargs)
+                next_f = next(chain)
+                next_f(cb)
+            except StopIteration:
+                return
+        next_f(cb)
+    return wrapper
 
 
 class ViewManager(object):
@@ -119,7 +147,11 @@ class KernelManager(object):
         if (name, kernel_id) in cls.kernels:
             return cls.kernels[(name, kernel_id)]
         else:
-            kernel = KernelConnection(name, kernel_id, cls, logger=HERMES_LOGGER)
+            kernel = KernelConnection(
+                name,
+                kernel_id,
+                cls,
+                logger=HERMES_LOGGER)
             cls.kernels[(name, kernel_id)] = kernel
             return kernel
 
@@ -137,25 +169,76 @@ class KernelManager(object):
             manager=cls)
 
 
+@chain_callbacks
+def _set_url(window, *, continue_cb=lambda: None):
+    # TODO: read from config file
+    connection_list = ["http://localhost:8888"]
+    connection_list += ["Input url"]
+
+    index = yield partial(
+        window.show_quick_panel,
+        connection_list)
+    if index == -1:
+        return
+    if index == len(connection_list):
+        sublime.active_window().show_input_panel(
+            'URL: ', '', KernelManager.set_url, None, None)
+    else:
+        url = connection_list[index]
+        KernelManager.set_url(url)
+    continue_cb()
+
+
 class HermesSetUrl(WindowCommand):
     """Set url of jupyter process."""
 
-    @staticmethod
-    def run():
+    def run(self):
         """Command."""
-        # TODO: read from config file
-        connection_list = ["http://localhost:8888"]
-        connection_list += ["Input url"]
+        _set_url(self.window)
 
-        def callback(index):
-            if index == len(connection_list):
-                sublime.active_window().show_input_panel(
-                    'URL: ', '', KernelManager.set_url, None, None)
-            else:
-                url = connection_list[index]
-                KernelManager.set_url(url)
-        sublime.active_window().show_quick_panel(
-            connection_list, callback)
+
+@chain_callbacks
+def _start_kernel(
+    window,
+    view,
+    *,
+    continue_cb=lambda: None,
+    logger=HERMES_LOGGER
+):
+    try:
+        kernelspecs = KernelManager.list_kernelspecs()
+    except requests.RequestException:
+        sublime.message_dialog("Set URL first, please.")
+        window = sublime.active_window()
+        yield partial(_set_url, window)
+
+    menu_items = list(kernelspecs["kernelspecs"].keys())
+
+    index = yield partial(
+        window.show_quick_panel,
+        menu_items)
+
+    if index == -1:
+        return
+    selected_kernelspec = menu_items[index]
+    kernel = KernelManager.start_kernel(selected_kernelspec)
+    ViewManager.connect_kernel(
+        view.buffer_id(),
+        kernel.lang,
+        kernel.kernel_id)
+    if view.file_name():
+        view_name = view.file_name()
+    else:
+        view_name = view.name()
+    log_info_msg = (
+        "Connected view '{view_name}(id: {buffer_id})'"
+        "to kernel {kernel_id}.").format(
+        view_name=view_name,
+        buffer_id=view.buffer_id(),
+        kernel_id=kernel.kernel_id)
+    logger.info(log_info_msg)
+
+    continue_cb()
 
 
 class HermesStartKernel(TextCommand):
@@ -163,35 +246,59 @@ class HermesStartKernel(TextCommand):
 
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
-        try:
-            kernelspecs = KernelManager.list_kernelspecs()
-        except requests.RequestException:
-            sublime.message_dialog("Set URL first, please.")
-            sublime.active_window().run_command("hermes_set_url")
-            return
-        menu_items = list(kernelspecs["kernelspecs"].keys())
+        _start_kernel(sublime.active_window(), self.view)
 
-        def callback(index):
-            selected_kernelspec = menu_items[index]
-            kernel = KernelManager.start_kernel(selected_kernelspec)
-            ViewManager.connect_kernel(
-                self.view.buffer_id(),
-                kernel.lang,
-                kernel.kernel_id)
-            if self.view.file_name():
-                view_name = self.view.file_name()
-            else:
-                view_name = self.view.name()
-            log_info_msg = (
-                "Connected view '{view_name}(id: {buffer_id})'"
-                "to kernel {kernel_id}.").format(
-                view_name=view_name,
-                buffer_id=self.view.buffer_id(),
-                kernel_id=kernel.kernel_id)
-            logger.info(log_info_msg)
 
-        sublime.active_window().show_quick_panel(
-            menu_items, callback)
+@chain_callbacks
+def _connect_kernel(
+    window,
+    view,
+    *,
+    continue_cb=lambda: None,
+    logger=HERMES_LOGGER
+):
+    try:
+        kernel_list = KernelManager.list_kernels()
+    except (requests.RequestException, AttributeError):
+        sublime.message_dialog("Set URL first, please.")
+        yield lambda cb: _set_url(window, continue_cb=cb)
+        kernel_list = KernelManager.list_kernels()
+
+    menu_items = [
+        "[{lang}] {kernel_id}".format(
+            lang=kernel["name"],
+            kernel_id=kernel["id"])
+        for kernel
+        in kernel_list]
+    menu_items += ["New kernel"]
+
+    index = yield partial(
+        window.show_quick_panel,
+        menu_items)
+
+    if index == -1:
+        return
+    elif index == len(kernel_list):
+        yield partial(_start_kernel, window, view)
+    else:
+        selected_kernel = kernel_list[index]
+        ViewManager.connect_kernel(
+            view.buffer_id(),
+            selected_kernel["name"],
+            selected_kernel["id"])
+        if view.file_name():
+            view_name = view.file_name()
+        else:
+            view_name = view.name()
+        log_info_msg = (
+            "Connected view '{view_name}(id: {buffer_id})'"
+            "to kernel {kernel_id}.").format(
+            view_name=view_name,
+            buffer_id=view.buffer_id(),
+            kernel_id=selected_kernel["id"])
+        logger.info(log_info_msg)
+
+    continue_cb()
 
 
 class HermesConnectKernel(TextCommand):
@@ -199,42 +306,7 @@ class HermesConnectKernel(TextCommand):
 
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
-        try:
-            kernel_list = KernelManager.list_kernels()
-        except requests.RequestException:
-            sublime.message_dialog("Set URL first, please.")
-            sublime.active_window().run_command("hermes_set_url")
-            return
-        menu_items = [
-            "[{lang}] {kernel_id}".format(
-                lang=kernel["name"],
-                kernel_id=kernel["id"])
-            for kernel
-            in kernel_list]
-
-        def callback(index):
-            if index == len(kernel_list):
-                self.view.run_command("hermes_start_kernel")
-                return
-            selected_kernel = kernel_list[index]
-            ViewManager.connect_kernel(
-                self.view.buffer_id(),
-                selected_kernel["name"],
-                selected_kernel["id"])
-            if self.view.file_name():
-                view_name = self.view.file_name()
-            else:
-                view_name = self.view.name()
-            log_info_msg = (
-                "Connected view '{view_name}(id: {buffer_id})'"
-                "to kernel {kernel_id}.").format(
-                view_name=view_name,
-                buffer_id=self.view.buffer_id(),
-                kernel_id=selected_kernel["id"])
-            logger.info(log_info_msg)
-        menu_items += ["New kernel"]
-        sublime.active_window().show_quick_panel(
-            menu_items, callback)
+        _connect_kernel(sublime.active_window(), self.view, logger=logger)
 
 
 def get_line(view: sublime.View, row: int) -> str:
@@ -286,28 +358,37 @@ def get_chunk(view: sublime.View, s: sublime.Region) -> str:
     raise NotImplementedError
 
 
+@chain_callbacks
+def _execute_block(view, *, logger=HERMES_LOGGER):
+    try:
+        kernel = ViewManager.get_kernel_for_view(view.buffer_id())
+    except KeyError:
+        sublime.message_dialog("No kernel is connected to this view.")
+        yield lambda cb: _connect_kernel(
+            sublime.active_window(),
+            view,
+            continue_cb=cb)
+        kernel = ViewManager.get_kernel_for_view(view.buffer_id())
+
+    pre_code = []
+    for s in view.sel():
+        code = get_block(view, s)
+        if code == pre_code:
+            continue
+        kernel.execute_code(code)
+        log_info_msg = "Executed code {code} with kernel {kernel_id}".format(
+            code=code,
+            kernel_id=kernel.kernel_id)
+        logger.info(log_info_msg)
+        pre_code = code
+
 
 class HermesExecuteBlock(TextCommand):
     """Execute code."""
 
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
-        try:
-            kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
-        except KeyError:
-            sublime.message_dialog("No kernel is connected to this view.")
-            self.view.run_command("hermes_connect_kernel")
-        pre_code = []
-        for s in self.view.sel():
-            code = get_block(self.view, s)
-            if code == pre_code:
-                continue
-            kernel.execute_code(code)
-            log_info_msg = "Executed code {code} with kernel {kernel_id}".format(
-                code=code,
-                kernel_id=kernel.kernel_id)
-            logger.info(log_info_msg)
-            pre_code = code
+        _execute_block(self.view, logger=logger)
 
 
 class HermesCompleter(EventListener):
