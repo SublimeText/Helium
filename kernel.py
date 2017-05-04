@@ -11,12 +11,10 @@ from threading import Thread
 from queue import Queue
 from urllib.parse import quote
 import json
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), "lib"))
-from websocket import create_connection
 from uuid import uuid4
 from datetime import datetime
+
+from websocket import create_connection
 
 import sublime
 
