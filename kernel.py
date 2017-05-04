@@ -20,6 +20,10 @@ import sublime
 
 JUPYTER_PROTOCOL_VERSION = '5.0'
 
+REPLY_STATUS_OK = "ok"
+REPLY_STATUS_ERROR = "error"
+REPLY_STATUS_ABORT = "abort"
+
 MSG_TYPE_EXECUTE_REQUEST = 'execute_request'
 MSG_TYPE_EXECUTE_RESULT = 'execute_result'
 MSG_TYPE_EXECUTE_REPLY = 'execute_reply'
@@ -50,22 +54,50 @@ def extract_data(result):
 class JupyterReply(object):
     """Parse replies from Jupyter."""
 
-    def __init__(self, reply):
+    def __init__(self, messages, message_type="execute", *, logger=None):
         """Parse message and initialize self."""
+        reply, = extract_content(messages, message_type+"_reply")
+        self._status = reply["status"]
+        self._execution_count = reply["execution_count"]
         display_contents = extract_content(
-            reply,
+            messages,
             MSG_TYPE_DISPLAY_DATA)
         self._display_data = [
             extract_data(display_content)
             for display_content
             in display_contents]
-        result_content = extract_content(
-            reply,
-            MSG_TYPE_EXECUTE_RESULT)
-        if len(result_content) == 0:
-            return
-        result, = result_content
-        self._execute_result = extract_data(result)
+        if self._status == REPLY_STATUS_OK:
+            result_content = extract_content(
+                messages,
+                MSG_TYPE_EXECUTE_RESULT)
+            if len(result_content) == 0:
+                return
+            result, = result_content
+            self._execute_result = extract_data(result)
+        elif self._status == REPLY_STATUS_ERROR:
+            self._ename = reply["ename"]
+            self._evalue = reply["evalue"]
+            self._traceback = reply["traceback"]
+
+    @property
+    def status(self):
+        return self._status
+
+    @property
+    def ename(self):
+        return self._ename
+
+    @property
+    def evalue(self):
+        return self._evalue
+
+    @property
+    def traceback(self):
+        return self._traceback
+
+    @property
+    def execution_count(self):
+        return self._execution_count
 
     @property
     def display_data(self):
@@ -214,6 +246,16 @@ class KernelConnection(object):
         for line in ["input:", code, "output:", result, "---", "\n"]:
             self._write_to_view(line + "\n")
 
+    def _output_error(self, reply: JupyterReply) -> None:
+        try:
+            lines = ["error:"]
+            lines += [reply.ename, reply.evalue] + reply.traceback
+            for line in lines:
+                self._write_to_view(line + "\n")
+        except AttributeError:
+            # Just there is no error.
+            pass
+
     def _write_to_view(self, text: str) -> None:
         self.activate_view()
         view = self.get_view()
@@ -239,7 +281,7 @@ class KernelConnection(object):
     def execute_code(self, code):
         """Run code with Jupyter kernel."""
         def callback(reply):
-            reply_obj = JupyterReply(reply)
+            reply_obj = JupyterReply(reply, logger=self._logger)
             for display_data in reply_obj.display_data:
                 for mime_type, data in display_data.items():
                     try:
@@ -259,6 +301,8 @@ class KernelConnection(object):
                         reply_obj.execute_result[mime_type])
                 except KeyError:
                     pass
+            self._logger.info("Caught error.")
+            self._output_error(reply_obj)
 
         header = self._gen_header(MSG_TYPE_EXECUTE_REQUEST)
         content = dict(
