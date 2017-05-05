@@ -16,11 +16,13 @@ from .kernel import KernelConnection
 import requests
 
 # Logger setting
+HERMES_LOGGER = getLogger(__name__)
 HANDLER = StreamHandler()
 HANDLER.setLevel(INFO)
-HERMES_LOGGER = getLogger(__name__)
-HERMES_LOGGER.setLevel(INFO)
-HERMES_LOGGER.addHandler(HANDLER)
+
+if len(HERMES_LOGGER.handlers) == 0:
+    HERMES_LOGGER.setLevel(INFO)
+    HERMES_LOGGER.addHandler(HANDLER)
 
 # Regex patterns to extract code lines.
 INDENT_PATTERN = re.compile(r"^([ \t]*)")
