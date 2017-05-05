@@ -31,6 +31,8 @@ MSG_TYPE_EXECUTE_REPLY = 'execute_reply'
 MSG_TYPE_COMPLETE_REQUEST = 'complete_request'
 MSG_TYPE_COMPLETE_REPLY = 'complete_reply'
 MSG_TYPE_DISPLAY_DATA = 'display_data'
+MSG_TYPE_ERROR = 'error'
+MSG_TYPE_STREAM = 'stream'
 
 HERMES_FIGURE_PHANTOMS = "hermes_figure_phantoms"
 
@@ -42,6 +44,10 @@ def extract_content(messages, msg_type):
         for message
         in messages
         if message['header']['msg_type'] == msg_type]
+
+
+def get_msg_type(message):
+    return message['header']['msg_type']
 
 
 def extract_data(result):
@@ -57,28 +63,34 @@ class JupyterReply(object):
 
     def __init__(self, messages, message_type="execute", *, logger=None):
         """Parse message and initialize self."""
-        reply, = extract_content(messages, message_type+"_reply")
-        self._status = reply["status"]
-        self._execution_count = reply["execution_count"]
-        display_contents = extract_content(
-            messages,
-            MSG_TYPE_DISPLAY_DATA)
-        self._display_data = [
-            extract_data(display_content)
-            for display_content
-            in display_contents]
-        if self._status == REPLY_STATUS_OK:
-            result_content = extract_content(
-                messages,
-                MSG_TYPE_EXECUTE_RESULT)
-            if len(result_content) == 0:
-                return
-            result, = result_content
-            self._execute_result = extract_data(result)
-        elif self._status == REPLY_STATUS_ERROR:
-            self._ename = reply["ename"]
-            self._evalue = reply["evalue"]
-            self._traceback = reply["traceback"]
+        self._display_data = []
+        self._stream_stdout = []
+        self._stream_stderr = []
+        self._stream_other = []
+        for message in messages:
+            logger.info(message)
+            content = message.get("content", dict())
+            if "execution_count" in content:
+                self._execution_count = content["execution_count"]
+            msg_type = get_msg_type(message)
+            # switch by msg_type.
+            if msg_type.endswith("_reply"):
+                self._status = content["status"]
+            elif msg_type == MSG_TYPE_ERROR:
+                self._ename = content["ename"]
+                self._evalue = content["evalue"]
+                self._traceback = content["traceback"]
+            elif msg_type == MSG_TYPE_DISPLAY_DATA:
+                self._display_data.append(content["data"])
+            elif msg_type == MSG_TYPE_EXECUTE_RESULT:
+                self._execute_result = content["data"]
+            elif msg_type == MSG_TYPE_STREAM:
+                if content["name"] == "stdout":
+                    self._stream_stdout.append(content["text"])
+                elif content["name"] == "stderr":
+                    self._stream_stderr.append(content["text"])
+                else:
+                    self._stream_other.append(content["text"])
 
     @property
     def status(self):
@@ -113,6 +125,18 @@ class JupyterReply(object):
             return self._execute_result
         except AttributeError:
             return dict()
+
+    @property
+    def stream_stdout(self):
+        return self._stream_stdout
+
+    @property
+    def stream_stderr(self):
+        return self._stream_stderr
+
+    @property
+    def stream_other(self):
+        return self._stream_other
 
 
 class KernelConnection(object):
@@ -217,8 +241,8 @@ class KernelConnection(object):
         view.settings().set("word_wrap", "false")
 
     def _handle_display_data(self, reply: JupyterReply) -> None:
-        import base64
-        import tempfile
+        # import base64
+        # import tempfile
         # decoded = base64.b64decode(data)
         # with tempfile.TemporaryFile(delete=False, suffix=".png") as out_file:
         #     out_file.write(decoded)
@@ -231,7 +255,6 @@ class KernelConnection(object):
             content = '<img alt="Out" src="data:image/png;base64,{data}" />'.format(data=data.strip())
             file_size = self.get_view().size()
             region = sublime.Region(file_size, file_size)
-            phantom = sublime.Phantom(region, content, sublime.LAYOUT_BLOCK)
             self.get_view().add_phantom(HERMES_FIGURE_PHANTOMS, region, content, sublime.LAYOUT_BLOCK)
             self._logger.info("Created phantom {}".format(content))
 
@@ -241,7 +264,7 @@ class KernelConnection(object):
             code=code)
         self._write_to_view(line)
 
-    def _handle_text(self, reply: JupyterReply) -> None:
+    def _handle_result_text(self, reply: JupyterReply) -> None:
         try:
             lines = "\n\033[1;31mOut[{execution_count}]:\033[0m {result}".format(
                 execution_count=reply.execution_count,
@@ -256,6 +279,21 @@ class KernelConnection(object):
             lines += [reply.ename, reply.evalue] + reply.traceback
             for line in lines:
                 self._write_to_view(line + "\n")
+        except AttributeError:
+            # Just there is no error.
+            pass
+
+    def _handle_stream(self, reply: JupyterReply) -> None:
+        # Currently don't consider real time catching of streams.
+        try:
+            lines = []
+            if len(reply.stream_stdout) > 0:
+                lines += ["\n(stdout):"] + reply.stream_stdout + ["-" * 80]
+            if len(reply.stream_stderr) > 0:
+                lines += ["\n(stderr):"] + reply.stream_stderr + ["-" * 80]
+            if len(reply.stream_other) > 0:
+                lines += ["\n(other stream):"] + reply.stream_other + ["-" * 80]
+            self._write_to_view("\n".join(lines))
         except AttributeError:
             # Just there is no error.
             pass
@@ -287,9 +325,10 @@ class KernelConnection(object):
         def callback(reply):
             reply_obj = JupyterReply(reply, logger=self._logger)
             self._output_input_code(code, reply_obj.execution_count)
-            self._handle_text(reply_obj)
+            self._handle_stream(reply_obj)
             self._handle_display_data(reply_obj)
             self._handle_error(reply_obj)
+            self._handle_result_text(reply_obj)
 
         header = self._gen_header(MSG_TYPE_EXECUTE_REQUEST)
         content = dict(
