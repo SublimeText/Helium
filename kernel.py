@@ -18,6 +18,7 @@ from websocket import create_connection
 
 import sublime
 
+
 JUPYTER_PROTOCOL_VERSION = '5.0'
 
 REPLY_STATUS_OK = "ok"
@@ -164,12 +165,6 @@ class KernelConnection(object):
             kernel_id=quote(kernel_id))
         self._async_communicator = KernelConnection.AsyncCommunicator(self)
         self._async_communicator.start()
-        self._handle_display_data = {
-            "image/png": self._handle_png_display_data
-        }
-        self._run_commands = {
-            "text/plain": self._handle_text
-        }
         self._max_shown_input_length = max_shown_input_length
         self._logger = logger
 
@@ -221,7 +216,7 @@ class KernelConnection(object):
         view.set_scratch(True)  # avoids prompting to save
         view.settings().set("word_wrap", "false")
 
-    def _handle_png_display_data(self, data: bytes) -> None:
+    def _handle_display_data(self, reply: JupyterReply) -> None:
         import base64
         import tempfile
         # decoded = base64.b64decode(data)
@@ -230,25 +225,34 @@ class KernelConnection(object):
         #     view_output = "Saved the figure to '{out_file}'.\n".format(
         #         out_file=out_file.name)
         #     self._write_to_view(view_output)
-        self._logger.info("Output image.")
-        content = '<img alt="Out" src="data:image/png;base64,{data}" />'.format(data=data.strip())
-        file_size = self.get_view().size()
-        region = sublime.Region(file_size, file_size)
-        phantom = sublime.Phantom(region, content, sublime.LAYOUT_BLOCK)
-        self.get_view().add_phantom(HERMES_FIGURE_PHANTOMS, region, content, sublime.LAYOUT_BLOCK)
-        self._logger.info("Created phantom {}".format(content))
+        self._logger.info("Caught image.")
+        for mime_data in reply.display_data:
+            data = mime_data["image/png"]
+            content = '<img alt="Out" src="data:image/png;base64,{data}" />'.format(data=data.strip())
+            file_size = self.get_view().size()
+            region = sublime.Region(file_size, file_size)
+            phantom = sublime.Phantom(region, content, sublime.LAYOUT_BLOCK)
+            self.get_view().add_phantom(HERMES_FIGURE_PHANTOMS, region, content, sublime.LAYOUT_BLOCK)
+            self._logger.info("Created phantom {}".format(content))
 
-    def _handle_text(self, code: str, result: str) -> None:
-        if len(code) > self._max_shown_input_length:
-            # truncate if input if too long.
-            # truncation of the output should be each kernel's deal.
-            code = code[:self._max_shown_input_length] + "..."
-        for line in ["input:", code, "output:", result, "---", "\n"]:
-            self._write_to_view(line + "\n")
+    def _output_input_code(self, code, execution_count):
+        line = "\n\033[1;32mIn[{execution_count}]:\033[0m {code}".format(
+            execution_count=execution_count,
+            code=code)
+        self._write_to_view(line)
 
-    def _output_error(self, reply: JupyterReply) -> None:
+    def _handle_text(self, reply: JupyterReply) -> None:
         try:
-            lines = ["error:"]
+            lines = "\n\033[1;31mOut[{execution_count}]:\033[0m {result}".format(
+                execution_count=reply.execution_count,
+                result=reply.execute_result["text/plain"])
+            self._write_to_view(lines)
+        except KeyError:
+            pass
+
+    def _handle_error(self, reply: JupyterReply) -> None:
+        try:
+            lines = ["\n"]
             lines += [reply.ename, reply.evalue] + reply.traceback
             for line in lines:
                 self._write_to_view(line + "\n")
@@ -282,27 +286,10 @@ class KernelConnection(object):
         """Run code with Jupyter kernel."""
         def callback(reply):
             reply_obj = JupyterReply(reply, logger=self._logger)
-            for display_data in reply_obj.display_data:
-                for mime_type, data in display_data.items():
-                    try:
-                        self._handle_display_data[mime_type](
-                            data[mime_type])
-                    except KeyError:
-                        pass
-            mime_types = [
-                mime_type
-                for mime_type
-                in reply_obj.execute_result
-                if mime_type in self._run_commands]
-            for mime_type in mime_types:
-                try:
-                    self._run_commands[mime_type](
-                        code,
-                        reply_obj.execute_result[mime_type])
-                except KeyError:
-                    pass
-            self._logger.info("Caught error.")
-            self._output_error(reply_obj)
+            self._output_input_code(code, reply_obj.execution_count)
+            self._handle_text(reply_obj)
+            self._handle_display_data(reply_obj)
+            self._handle_error(reply_obj)
 
         header = self._gen_header(MSG_TYPE_EXECUTE_REQUEST)
         content = dict(
