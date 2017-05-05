@@ -259,14 +259,15 @@ class KernelConnection(object):
             self._logger.info("Created phantom {}".format(content))
 
     def _output_input_code(self, code, execution_count):
-        line = "\n\033[1;32mIn[{execution_count}]:\033[0m {code}".format(
+        line = "\nIn[{execution_count}]: {code}".format(
             execution_count=execution_count,
             code=code)
         self._write_to_view(line)
 
     def _handle_result_text(self, reply: JupyterReply) -> None:
         try:
-            lines = "\n\033[1;31mOut[{execution_count}]:\033[0m {result}".format(
+            # lines = "\n\033[1;31mOut[{execution_count}]:\033[0m {result}".format(
+            lines = "\nOut[{execution_count}]: {result}".format(
                 execution_count=reply.execution_count,
                 result=reply.execute_result["text/plain"])
             self._write_to_view(lines)
