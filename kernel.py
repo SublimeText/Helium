@@ -39,6 +39,8 @@ HERMES_FIGURE_PHANTOMS = "hermes_figure_phantoms"
 
 ANSI_ESCAPE_PATTERN = re.compile(r'\x1b[^m]*m')
 
+OUTPUT_VIEW_SEPARATOR = "-" * 80
+
 
 def extract_content(messages, msg_type):
     """Extract content from messages received from a kernel."""
@@ -270,7 +272,7 @@ class KernelConnection(object):
             self._logger.info("Created phantom {}".format(content))
 
     def _output_input_code(self, code, execution_count):
-        line = "\nIn[{execution_count}]: {code}".format(
+        line = "\n" + OUTPUT_VIEW_SEPARATOR + "\n\nIn[{execution_count}]: {code}".format(
             execution_count=execution_count,
             code=code)
         self._write_to_view(line)
@@ -299,11 +301,11 @@ class KernelConnection(object):
         try:
             lines = []
             if len(reply.stream_stdout) > 0:
-                lines += ["\n(stdout):"] + reply.stream_stdout + ["-" * 80]
+                lines += ["\n(stdout):"] + reply.stream_stdout + [OUTPUT_VIEW_SEPARATOR]
             if len(reply.stream_stderr) > 0:
-                lines += ["\n(stderr):"] + reply.stream_stderr + ["-" * 80]
+                lines += ["\n(stderr):"] + reply.stream_stderr + [OUTPUT_VIEW_SEPARATOR]
             if len(reply.stream_other) > 0:
-                lines += ["\n(other stream):"] + reply.stream_other + ["-" * 80]
+                lines += ["\n(other stream):"] + reply.stream_other + [OUTPUT_VIEW_SEPARATOR]
             self._write_to_view("\n".join(lines))
         except AttributeError:
             # Just there is no error.
