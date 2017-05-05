@@ -252,7 +252,9 @@ class KernelConnection(object):
         self._logger.info("Caught image.")
         for mime_data in reply.display_data:
             data = mime_data["image/png"]
-            content = '<img alt="Out" src="data:image/png;base64,{data}" />'.format(data=data.strip())
+            content = '<body style="background-color:white"> <img alt="Out" src="data:image/png;base64,{data}" /> </body>'.format(
+                data=data.strip(),
+                bgcolor="white")
             file_size = self.get_view().size()
             region = sublime.Region(file_size, file_size)
             self.get_view().add_phantom(HERMES_FIGURE_PHANTOMS, region, content, sublime.LAYOUT_BLOCK)
