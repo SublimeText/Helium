@@ -13,6 +13,7 @@ from urllib.parse import quote
 import json
 from uuid import uuid4
 from datetime import datetime
+import re
 
 from websocket import create_connection
 
@@ -36,6 +37,8 @@ MSG_TYPE_STREAM = 'stream'
 
 HERMES_FIGURE_PHANTOMS = "hermes_figure_phantoms"
 
+ANSI_ESCAPE_PATTERN = re.compile(r'\x1b[^m]*m')
+
 
 def extract_content(messages, msg_type):
     """Extract content from messages received from a kernel."""
@@ -44,6 +47,10 @@ def extract_content(messages, msg_type):
         for message
         in messages
         if message['header']['msg_type'] == msg_type]
+
+
+def remove_ansi_escape(text: str):
+    return ANSI_ESCAPE_PATTERN.sub('', text)
 
 
 def get_msg_type(message):
@@ -236,9 +243,11 @@ class KernelConnection(object):
     def activate_view(self):
         """Activate view to show the output of kernel."""
         view = self.get_view()
+        current_view = sublime.active_window().active_view()
         sublime.active_window().focus_view(view)
         view.set_scratch(True)  # avoids prompting to save
         view.settings().set("word_wrap", "false")
+        sublime.active_window().focus_view(current_view)
 
     def _handle_display_data(self, reply: JupyterReply) -> None:
         # import base64
@@ -280,8 +289,7 @@ class KernelConnection(object):
         try:
             lines = ["\n"]
             lines += [reply.ename, reply.evalue] + reply.traceback
-            for line in lines:
-                self._write_to_view(line + "\n")
+            self._write_to_view(remove_ansi_escape("\n".join(lines)))
         except AttributeError:
             # Just there is no error.
             pass
