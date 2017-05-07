@@ -286,7 +286,7 @@ class KernelConnection(object):
             self._logger.info("Created phantom {}".format(content))
 
     def _output_input_code(self, code, execution_count):
-        line = "\n" + OUTPUT_VIEW_SEPARATOR + "\n\nIn[{execution_count}]: {code}".format(
+        line = "In[{execution_count}]: {code}".format(
             execution_count=execution_count,
             code=code)
         self._write_to_view(line)
@@ -303,9 +303,12 @@ class KernelConnection(object):
 
     def _handle_error(self, reply: JupyterReply) -> None:
         try:
-            lines = ["\n"]
-            lines += [reply.ename, reply.evalue] + reply.traceback
-            self._write_to_view(remove_ansi_escape("\n".join(lines)))
+            lines = "\nError[{execution_count}]: {ename}, {evalue}.\nTraceback:\n{traceback}".format(
+                execution_count=reply.execution_count,
+                ename=reply.ename,
+                evalue=reply.evalue,
+                traceback="\n".join(reply.traceback))
+            self._write_to_view(remove_ansi_escape(lines))
         except AttributeError:
             # Just there is no error.
             pass
@@ -315,11 +318,11 @@ class KernelConnection(object):
         try:
             lines = []
             if len(reply.stream_stdout) > 0:
-                lines += ["\n(stdout):"] + reply.stream_stdout + [OUTPUT_VIEW_SEPARATOR]
+                lines += ["\n(stdout):"] + reply.stream_stdout
             if len(reply.stream_stderr) > 0:
-                lines += ["\n(stderr):"] + reply.stream_stderr + [OUTPUT_VIEW_SEPARATOR]
+                lines += ["\n(stderr):"] + reply.stream_stderr
             if len(reply.stream_other) > 0:
-                lines += ["\n(other stream):"] + reply.stream_other + [OUTPUT_VIEW_SEPARATOR]
+                lines += ["\n(other stream):"] + reply.stream_other
             self._write_to_view("\n".join(lines))
         except AttributeError:
             # Just there is no error.
@@ -351,11 +354,15 @@ class KernelConnection(object):
         """Run code with Jupyter kernel."""
         def callback(reply):
             reply_obj = JupyterReply(reply, logger=self._logger)
-            self._output_input_code(code, reply_obj.execution_count)
-            self._handle_stream(reply_obj)
-            self._handle_display_data(reply_obj)
-            self._handle_error(reply_obj)
-            self._handle_result_text(reply_obj)
+            try:
+                self._output_input_code(code, reply_obj.execution_count)
+                self._handle_stream(reply_obj)
+                self._handle_display_data(reply_obj)
+                self._handle_error(reply_obj)
+                self._handle_result_text(reply_obj)
+            finally:
+                # Separator should be written if an undealt error occur while handling reply.
+                self._write_to_view("\n\n" + OUTPUT_VIEW_SEPARATOR + "\n\n")
 
         header = self._gen_header(MSG_TYPE_EXECUTE_REQUEST)
         content = dict(
