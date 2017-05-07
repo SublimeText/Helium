@@ -6,6 +6,7 @@ The concept of an editor extension communicating Jupyter kernels is inspired by 
 
 Any feedback is highly welcome, though currently I don't have any stipulated policy to contribute.
 
+![Introduction image](https://github.com/ngr-t/SublimeHermes/raw/images/README/intro.png)
 
 Features
 ---------------
