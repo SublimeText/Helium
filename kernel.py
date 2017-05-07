@@ -180,7 +180,10 @@ class KernelConnection(object):
             sublime
             .load_settings("Hermes.sublime-settings")
             .get("max_shown_input_length")),
+        auth_type=("no_auth", "password", "token")[0],
         *,
+        auth_info=None,
+        token=None,
         logger=None
     ):
         """Initialize KernelConnection class.
@@ -200,6 +203,9 @@ class KernelConnection(object):
         self._async_communicator.start()
         self._max_shown_input_length = max_shown_input_length
         self._logger = logger
+        self._auth_type = auth_type
+        self._auth_info = auth_info
+        self._token = token
 
     @property
     def lang(self):
@@ -220,7 +226,20 @@ class KernelConnection(object):
 
     def _communicate(self, message):
         """Send `message` to the kernel and return `reply` for it."""
-        sock = create_connection(self._ws_url)
+        if self._auth_type == "no_auth":
+            sock = create_connection(self._ws_url)
+        elif self._auth_type == "password":
+            sock = create_connection(
+                self._ws_url,
+                http_proxy_auth=self._auth_info)
+        elif self._auth_type == "token":
+            header_auth_body = "token {token}".format(
+                token=self._token)
+            header = dict(Authorization=header_auth_body)
+            sock = create_connection(
+                self._ws_url,
+                header=header)
+
         sock.send(json.dumps(message).encode())
         replies = []
         while True:

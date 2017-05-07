@@ -46,11 +46,14 @@ def chain_callbacks(f):
             nonlocal next_f
             try:
                 if len(args) + len(kwargs) != 0:
-                    chain.send(*args, **kwargs)
-                next_f = next(chain)
+                    next_f = chain.send(*args, **kwargs)
+                else:
+                    next_f = next(chain)
                 next_f(cb)
             except StopIteration:
+                print(next_f)
                 return
+        print(next_f)
         next_f(cb)
     return wrapper
 
@@ -108,6 +111,8 @@ class KernelManager(object):
         cls,
         base_url,
         base_ws_url=None,
+        auth=None,
+        token=None
     ):
         """Initialize a kernel manager.
 
@@ -118,6 +123,8 @@ class KernelManager(object):
             base_ws_url = "ws://" + url_body
         cls._base_url = base_url
         cls._base_ws_url = base_ws_url
+        cls._auth = auth
+        cls._token = token
 
     @classmethod
     def base_url(cls):
@@ -133,15 +140,13 @@ class KernelManager(object):
     def list_kernelspecs(cls):
         """Get the kernelspecs."""
         url = '{}/api/kernelspecs'.format(cls.base_url())
-        response = requests.get(url)
-        return response.json()
+        return cls.get_request(url)
 
     @classmethod
     def list_kernels(cls):
         """Get the list of kernels."""
         url = '{}/api/kernels'.format(cls.base_url())
-        response = requests.get(url)
-        return response.json()
+        return cls.get_request(url)
 
     @classmethod
     def get_kernel(cls, name, kernel_id):
@@ -149,12 +154,21 @@ class KernelManager(object):
         if (name, kernel_id) in cls.kernels:
             return cls.kernels[(name, kernel_id)]
         else:
-            kernel = KernelConnection(
-                name,
-                kernel_id,
-                cls,
-                logger=HERMES_LOGGER)
-            cls.kernels[(name, kernel_id)] = kernel
+            if cls._token:
+                kernel = KernelConnection(
+                    name,
+                    kernel_id,
+                    cls,
+                    auth_type="token",
+                    token=cls._token,
+                    logger=HERMES_LOGGER)
+            else:
+                kernel = KernelConnection(
+                    name,
+                    kernel_id,
+                    cls,
+                    logger=HERMES_LOGGER)
+                cls.kernels[(name, kernel_id)] = kernel
             return kernel
 
     @classmethod
@@ -162,13 +176,40 @@ class KernelManager(object):
         """Start kernel and return a `Kernel` instance."""
         url = '{}/api/kernels'.format(cls.base_url())
         data = dict(name=name)
-        response = requests.post(
+        response = cls.post_request(
             url,
-            data=json.dumps(data)).json()
+            data=json.dumps(data))
         return KernelConnection(
             lang=response["name"],
             kernel_id=response["id"],
             manager=cls)
+
+    @classmethod
+    def post_request(cls, url, data):
+        if cls._token:
+            header_auth_body = "token {token}".format(
+                token=cls._token)
+            header = dict(Authorization=header_auth_body)
+        else:
+            header = dict()
+        response = requests.post(
+            url,
+            data=data,
+            headers=header)
+        return response.json()
+
+    @classmethod
+    def get_request(cls, url):
+        if cls._token:
+            header_auth_body = "token {token}".format(
+                token=cls._token)
+            header = dict(Authorization=header_auth_body)
+        else:
+            header = dict()
+        response = requests.get(
+            url,
+            headers=header)
+        return response.json()
 
 
 @chain_callbacks
@@ -177,17 +218,35 @@ def _set_url(window, *, continue_cb=lambda: None):
     connection_list = ["http://localhost:8888"]
     connection_list += ["Input url"]
 
-    index = yield partial(
+    connection_id = yield partial(
         window.show_quick_panel,
         connection_list)
-    if index == -1:
+    if connection_id == -1:
         return
-    if index == len(connection_list):
-        sublime.active_window().show_input_panel(
-            'URL: ', '', KernelManager.set_url, None, None)
+    elif connection_id == len(connection_list) - 1:
+        url = yield partial(
+            window.show_input_panel,
+            'URL: ',
+            '',
+            on_change=None,
+            on_cancel=None)
     else:
-        url = connection_list[index]
+        url = connection_list[connection_id]
+    auth_methods = ["Input token", "No token"]
+    auth_method_id = yield partial(
+        window.show_quick_panel,
+        auth_methods)
+    if auth_method_id == 0:
+        token = yield lambda cb: window.show_input_panel(
+            "token",
+            "",
+            cb,
+            lambda: None,
+            lambda: None)
+        KernelManager.set_url(url, token=token)
+    else:
         KernelManager.set_url(url)
+    print(continue_cb)
     continue_cb()
 
 

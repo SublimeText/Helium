@@ -9,6 +9,8 @@ The concept of an editor extension communicating Jupyter kernels is inspired by 
 TODO:
 
   - [ ] Authentication.
+    + [x] token
+    + [ ] password
   - [ ] Enable "allow_stdin".
   - [ ] Enable object inspection to be shown in panel and popup.
   - [ ] Implement output as inline Phantom like LightTable or Hydrogen.
