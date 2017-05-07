@@ -176,10 +176,6 @@ class KernelConnection(object):
         lang,
         kernel_id,
         manager,
-        max_shown_input_length=(
-            sublime
-            .load_settings("Hermes.sublime-settings")
-            .get("max_shown_input_length")),
         auth_type=("no_auth", "password", "token")[0],
         *,
         auth_info=None,
@@ -201,7 +197,6 @@ class KernelConnection(object):
             kernel_id=quote(kernel_id))
         self._async_communicator = KernelConnection.AsyncCommunicator(self)
         self._async_communicator.start()
-        self._max_shown_input_length = max_shown_input_length
         self._logger = logger
         self._auth_type = auth_type
         self._auth_info = auth_info
