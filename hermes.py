@@ -50,10 +50,8 @@ def chain_callbacks(f):
                 else:
                     next_f = next(chain)
                 next_f(cb)
-            except StopIteration:
-                print(next_f)
+            except StopIteration:￥
                 return
-        print(next_f)
         next_f(cb)
     return wrapper
 
