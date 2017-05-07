@@ -2,6 +2,13 @@
   "max_shown_input_length": 2000,
   "connections": [
     // The list of connections.
-    "http://localhost:8888"
+    // Example of connection setting:
+    /*
+     * {
+     *   "name": "localhost",             // The name of connection shown in the quick panel.
+     *   "url": "http://localhost:8888",  // The URL to access Jupyter notebook.  
+     *   "token": "..."                   // Authorization token. If this is not set, you will be asked when setting URL.
+     * }
+    */
   ],
 }

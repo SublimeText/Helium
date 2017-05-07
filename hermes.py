@@ -116,7 +116,8 @@ class KernelManager(object):
     ):
         """Initialize a kernel manager.
 
-        TODO: Deal with authentication.
+        TODO: Deal with password authorization.
+        Importance is low because token authorization is possible.
         """
         if base_ws_url is None:
             _, _, url_body = base_url.partition("://")
@@ -214,16 +215,21 @@ class KernelManager(object):
 
 @chain_callbacks
 def _set_url(window, *, continue_cb=lambda: None):
-    # TODO: read from config file
-    connection_list = ["http://localhost:8888"]
-    connection_list += ["Input url"]
+    settings = sublime.load_settings("Hermes.sublime-settings")
+    connections = settings.get("connections", [])
+    connection_menu_items = [
+        [connection["name"], connection["url"]]
+        for connection in connections
+    ]
+    connection_menu_items += [["New", "Input a new URL."]]
 
     connection_id = yield partial(
         window.show_quick_panel,
-        connection_list)
+        connection_menu_items)
     if connection_id == -1:
         return
-    elif connection_id == len(connection_list) - 1:
+    elif connection_id == len(connection_menu_items) - 1:
+        # When 'new' is chosen.
         url = yield partial(
             window.show_input_panel,
             'URL: ',
@@ -231,18 +237,17 @@ def _set_url(window, *, continue_cb=lambda: None):
             on_change=None,
             on_cancel=None)
     else:
-        url = connection_list[connection_id]
-    auth_methods = ["Input token", "No token"]
-    auth_method_id = yield partial(
-        window.show_quick_panel,
-        auth_methods)
-    if auth_method_id == 0:
+        url = connections[connection_id]["url"]
+    try:
+        token = connections[connection_id]["token"]
+    except (KeyError, IndexError):
         token = yield lambda cb: window.show_input_panel(
             "token",
             "",
             cb,
             lambda: None,
             lambda: None)
+    if token:
         KernelManager.set_url(url, token=token)
     else:
         KernelManager.set_url(url)
@@ -262,8 +267,8 @@ class HermesSetUrl(WindowCommand):
 def _start_kernel(
     window,
     view,
-    *,
     continue_cb=lambda: None,
+    *,
     logger=HERMES_LOGGER
 ):
     try:
