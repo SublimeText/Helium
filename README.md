@@ -36,7 +36,7 @@ Why not using Jupyter Notebook?
 -----------------
 
 I admit Jupyter Notebook is a powerful tool for instantly sharing small analysis work, exploring data or APIs, or making executable tutorials. Yes, I often use it, too.
-However, in my opinion, it does not suited for projects with large code bases.
+However, in my opinion, it is not suited for projects with large code bases.
 I want to jumpt across files instantly, make modules organized (not saved as `.ipynb`s), kick scripts with various parameters, and make project code more reusable and reproducible... but still I want to edit them with interactive feedback.
 
 
