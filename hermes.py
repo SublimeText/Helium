@@ -470,7 +470,7 @@ class HermesCompleter(EventListener):
             # TODO: It's better to get code from buffer, not prefix.
             kernel = ViewManager.get_kernel_for_view(view.buffer_id())
             return [
-                (completion, ) * 2
+                (completion + "\tHermes", completion)
                 for completion
                 in kernel.get_complete(prefix, len(prefix))]
         except KeyError:
