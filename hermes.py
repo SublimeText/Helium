@@ -399,21 +399,23 @@ def get_block(view: sublime.View, s: sublime.Region) -> str:
     view_end_row = view.rowcol(view.size())[0]
     current_row = view.rowcol(s.begin())[0]
     current_indent = get_indent(view, current_row)
+    start_point = 0
     for first_row in range(current_row, -1, -1):
         indent = get_indent(view, first_row)
         if (not indent.startswith(current_indent) or
             get_line(view, first_row).strip() == ''
         ):
+            start_point = view.text_point(first_row + 1, 0)
             break
-    for last_row in range(current_row, view_end_row):
+    end_point = view.size()
+    for last_row in range(current_row, view_end_row + 1):
         indent = get_indent(view, last_row)
         if (not indent.startswith(current_indent) or
             get_line(view, last_row).strip() == ''
         ):
+            end_point = view.text_point(last_row, 0) - 1
             break
-    block_region = sublime.Region(
-        view.text_point(first_row + 1, 0),
-        view.text_point(last_row, 0) - 1)
+    block_region = sublime.Region(start_point, end_point)
     return view.substr(block_region)
 
 
