@@ -251,7 +251,6 @@ def _set_url(window, *, continue_cb=lambda: None):
         KernelManager.set_url(url, token=token)
     else:
         KernelManager.set_url(url)
-    print(continue_cb)
     continue_cb()
 
 
