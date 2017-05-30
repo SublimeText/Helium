@@ -17,7 +17,7 @@ Currently it supports the actions below:
 
     + The plugin can deal authorization by token.
 
-  - Connect view to a Jupyter kernel. We can start if there is no kernel.
+  - Connect view to a Jupyter kernel. We can also start a kernel.
   - Execute code block in view and get the result within ST3.
 
     + A view to store inputs and results is created for each kernel.
