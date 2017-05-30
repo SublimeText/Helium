@@ -51,9 +51,7 @@ def chain_callbacks(f):
                     next_f = next(chain)
                 next_f(cb)
             except StopIteration:
-                print(next_f)
                 return
-        print(next_f)
         next_f(cb)
     return wrapper
 
@@ -251,7 +249,6 @@ def _set_url(window, *, continue_cb=lambda: None):
         KernelManager.set_url(url, token=token)
     else:
         KernelManager.set_url(url)
-    print(continue_cb)
     continue_cb()
 
 
