@@ -1,4 +1,6 @@
 {
+  "complete": true,  // Whether use Hermes' autocomplete powered by Jupyter kernel.
+  "complete_timeout": 0.5, // Timeout to get completion (in seconds).
   "connections": [
     // The list of connections.
     // Example of connection setting:

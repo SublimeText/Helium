@@ -37,6 +37,9 @@ MSG_TYPE_STREAM = 'stream'
 
 HERMES_FIGURE_PHANTOMS = "hermes_figure_phantoms"
 
+# Used as key of status bar.
+KERNEL_STATUS_KEY = "hermes_kernel_status"
+
 ANSI_ESCAPE_PATTERN = re.compile(r'\x1b[^m]*m')
 
 OUTPUT_VIEW_SEPARATOR = "-" * 80
@@ -219,14 +222,23 @@ class KernelConnection(object):
             lang=self.lang,
             kernel_id=self.kernel_id)
 
-    def _communicate(self, message):
+    def _communicate(self, message, timeout=None):
         """Send `message` to the kernel and return `reply` for it."""
+        # Use `create_connection`'s default value unless `timeout` is set.
+        if timeout is not None:
+            connect_kwargs = dict(timeout=timeout)
+        else:
+            connect_kwargs = dict()
+
         if self._auth_type == "no_auth":
-            sock = create_connection(self._ws_url)
+            sock = create_connection(
+                self._ws_url,
+                **connect_kwargs)
         elif self._auth_type == "password":
             sock = create_connection(
                 self._ws_url,
-                http_proxy_auth=self._auth_info)
+                http_proxy_auth=self._auth_info,
+                **connect_kwargs)
         elif self._auth_type == "token":
             header_auth_body = "token {token}".format(
                 token=self._token)
@@ -337,6 +349,9 @@ class KernelConnection(object):
             {'characters': text})
         view.set_read_only(True)
 
+    def update_status_bar(self):
+        self._communicate()
+
     def get_view(self):
         """Get view corresponds to the KernelConnection."""
         view = None
@@ -382,7 +397,7 @@ class KernelConnection(object):
         info_message = "Kernel executed code ```{code}```.".format(code=code)
         self._logger.info(info_message)
 
-    def get_complete(self, code, cursor_pos):
+    def get_complete(self, code, cursor_pos, timeout=None):
         """Generate complete request."""
         header = self._gen_header(MSG_TYPE_COMPLETE_REQUEST)
         content = dict(
@@ -399,6 +414,6 @@ class KernelConnection(object):
             content=content,
             metadata={},
             buffers={})
-        reply = self._communicate(message)
+        reply = self._communicate(message, timeout)
         content, = extract_content(reply, MSG_TYPE_COMPLETE_REPLY)
         return content["matches"]

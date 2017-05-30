@@ -14,6 +14,7 @@ from sublime_plugin import WindowCommand, TextCommand, EventListener
 from .kernel import KernelConnection
 
 import requests
+from websocket import WebSocketTimeoutException
 
 # Logger setting
 HERMES_LOGGER = getLogger(__name__)
@@ -464,13 +465,26 @@ class HermesCompleter(EventListener):
         logger=HERMES_LOGGER
     ):
         """Get completions from the jupyter kernel."""
+        use_complete = (
+            sublime
+            .load_settings("Hermes.sublime-settings")
+            .get("complete")
+        )
+        if not use_complete:
+            return None
+        timeout = (
+            sublime
+            .load_settings("Hermes.sublime-settings")
+            .get("complete_timeout")
+        )
         try:
-            # TODO: provide the way to toggle completion from the package.
-            # TODO: It's better to get code from buffer, not prefix.
             kernel = ViewManager.get_kernel_for_view(view.buffer_id())
+            location = locations[0]
+            code = view.substr(view.line(location))
+            _, col = view.rowcol(location)
             return [
                 (completion + "\tHermes", completion)
                 for completion
-                in kernel.get_complete(prefix, len(prefix))]
-        except KeyError:
-            pass
+                in kernel.get_complete(code, col, timeout)]
+        except (KeyError, WebSocketTimeoutException):
+            return None
