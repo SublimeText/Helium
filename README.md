@@ -63,17 +63,18 @@ Usage
 
   3. Execute code by `Hermes: Execute Block` (whose command name is `hermes_execute_block`).
 
-    - The adjacent lines with no empty line and not less indented than the line which includes the cursor are considered as the code block.
+    - If there are selected regions, execute them.
+    - If not, the adjacent lines with no empty line and not less indented than the line which includes the cursor are considered as the code block.
 
 TODO
 -----------------
 
-  - [ ] Consider other ways to extract code block from a view.
+  - [x] Consider other ways to extract code block from a view.
 
-    - [ ] Use selection.
+    - [x] Use selection.
 
   - [ ] Enable to handle `stdin_request`.
-  - [ ] Enable to toggle if completions are shown.
+  - [x] Enable to toggle if completions are shown.
   - [ ] Moving cursor on execution.
   - [ ] Enable object inspection to be shown in panel and popup.
   - [ ] Implement output as inline Phantom like LightTable or Hydrogen.

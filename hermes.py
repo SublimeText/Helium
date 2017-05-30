@@ -393,7 +393,11 @@ def get_block(view: sublime.View, s: sublime.Region) -> str:
       - Includes the line under the cursor.
       - Includes no blank line.
       - More indented than that of the line under the cursor.
+
+    If `s` is a selected region, the code block is it.
     """
+    if not s.empty():
+        return view.substr(s)
     view_end_row = view.rowcol(view.size())[0]
     current_row = view.rowcol(s.begin())[0]
     current_indent = get_indent(view, current_row)
