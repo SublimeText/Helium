@@ -118,13 +118,27 @@ class KernelManager(object):
         TODO: Deal with password authorization.
         Importance is low because token authorization is possible.
         """
+        base_url = base_url.rstrip("/")
         if base_ws_url is None:
             _, _, url_body = base_url.partition("://")
             base_ws_url = "ws://" + url_body
+        else:
+            base_ws_url = base_ws_url.rstrip("/")
         cls._base_url = base_url
         cls._base_ws_url = base_ws_url
         cls._auth = auth
         cls._token = token
+        try:
+            # Check if we can connect to the kernel gateway
+            # via passed information.
+            cls.list_kernelspecs()
+        except requests.RequestException:
+            # If we can't, remove member attributes.
+            sublime.message_dialog("Invalid URL or token.")
+            del cls._base_url
+            del cls._base_ws_url
+            del cls._auth
+            del cls._token
 
     @classmethod
     def base_url(cls):
