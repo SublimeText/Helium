@@ -34,6 +34,7 @@ MSG_TYPE_COMPLETE_REPLY = 'complete_reply'
 MSG_TYPE_DISPLAY_DATA = 'display_data'
 MSG_TYPE_ERROR = 'error'
 MSG_TYPE_STREAM = 'stream'
+MSG_TYPE_STATUS = 'status'
 
 HERMES_FIGURE_PHANTOMS = "hermes_figure_phantoms"
 
@@ -88,6 +89,8 @@ class JupyterReply(object):
             # switch by msg_type.
             if msg_type.endswith("_reply"):
                 self._status = content["status"]
+                if msg_type == MSG_TYPE_COMPLETE_REPLY:
+                    self._matches = content["matches"]
             elif msg_type == MSG_TYPE_ERROR:
                 self._ename = content["ename"]
                 self._evalue = content["evalue"]
@@ -103,6 +106,8 @@ class JupyterReply(object):
                     self._stream_stderr.append(content["text"])
                 else:
                     self._stream_other.append(content["text"])
+            elif msg_type == MSG_TYPE_STATUS:
+                self._execution_state = content["execution_state"]
 
     @property
     def status(self):
@@ -149,6 +154,10 @@ class JupyterReply(object):
     @property
     def stream_other(self):
         return self._stream_other
+
+    @property
+    def matches(self):
+        return self._matches
 
 
 class KernelConnection(object):
@@ -222,7 +231,7 @@ class KernelConnection(object):
             lang=self.lang,
             kernel_id=self.kernel_id)
 
-    def _communicate(self, message, timeout=None):
+    def _communicate(self, message, timeout=None) -> JupyterReply:
         """Send `message` to the kernel and return `reply` for it."""
         # Use `create_connection`'s default value unless `timeout` is set.
         if timeout is not None:
@@ -252,9 +261,14 @@ class KernelConnection(object):
         while True:
             reply = json.loads(sock.recv())
             replies.append(reply)
-            if reply["msg_type"].endswith("_reply"):
-                break
-        return replies
+            self._logger.info(reply)
+            msg_type = get_msg_type(reply)
+            if msg_type == MSG_TYPE_STATUS:
+                self._execution_state = reply["content"]["execution_state"]
+                if self._execution_state == 'idle':
+                    break
+        reply_obj = JupyterReply(replies, logger=self._logger)
+        return reply_obj
 
     def _async_communicate(self, message, callback):
         self._async_communicator.message_queue.put((message, callback))
@@ -368,13 +382,12 @@ class KernelConnection(object):
     def execute_code(self, code):
         """Run code with Jupyter kernel."""
         def callback(reply):
-            reply_obj = JupyterReply(reply, logger=self._logger)
             try:
-                self._output_input_code(code, reply_obj.execution_count)
-                self._handle_stream(reply_obj)
-                self._handle_display_data(reply_obj)
-                self._handle_error(reply_obj)
-                self._handle_result_text(reply_obj)
+                self._output_input_code(code, reply.execution_count)
+                self._handle_stream(reply)
+                self._handle_display_data(reply)
+                self._handle_error(reply)
+                self._handle_result_text(reply)
             finally:
                 # Separator should be written if an undealt error occur while handling reply.
                 self._write_to_view("\n\n" + OUTPUT_VIEW_SEPARATOR + "\n\n")
@@ -397,6 +410,13 @@ class KernelConnection(object):
         info_message = "Kernel executed code ```{code}```.".format(code=code)
         self._logger.info(info_message)
 
+    @property
+    def execution_state(self):
+        try:
+            return self._execution_state
+        except AttributeError:
+            return "unknown"
+
     def get_complete(self, code, cursor_pos, timeout=None):
         """Generate complete request."""
         header = self._gen_header(MSG_TYPE_COMPLETE_REQUEST)
@@ -415,5 +435,4 @@ class KernelConnection(object):
             metadata={},
             buffers={})
         reply = self._communicate(message, timeout)
-        content, = extract_content(reply, MSG_TYPE_COMPLETE_REPLY)
-        return content["matches"]
+        return reply.matches

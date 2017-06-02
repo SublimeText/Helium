@@ -4,13 +4,18 @@ The package provides code execution and completion in interaction with Jupyter.
 Copyright (c) 2016, NEGORO Tetsuya (https://github.com/ngr-t)
 """
 
+import time
 import json
 import re
 from functools import (partial, wraps)
 from logging import getLogger, INFO, StreamHandler
 
 import sublime
-from sublime_plugin import WindowCommand, TextCommand, EventListener
+from sublime_plugin import (
+    WindowCommand,
+    TextCommand,
+    EventListener,
+    ViewEventListener)
 from .kernel import KernelConnection
 
 import requests
@@ -375,7 +380,10 @@ def _connect_kernel(
             buffer_id=view.buffer_id(),
             kernel_id=selected_kernel["id"])
         logger.info(log_info_msg)
-
+        status = "Hermes: [{name}] {kernel_id}".format(
+            name=selected_kernel["name"],
+            kernel_id=selected_kernel["id"])
+    _set_status_updater(view)
     continue_cb()
 
 
@@ -473,6 +481,31 @@ class HermesExecuteBlock(TextCommand):
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
         _execute_block(self.view, logger=logger)
+
+
+def _set_status_updater(view):
+    buffer_id = view.buffer_id()
+    if buffer_id != sublime.active_window().active_view().buffer_id():
+        return
+    try:
+        kernel = ViewManager.get_kernel_for_view(buffer_id)
+        status = "[{lang}] {kernel_id} ({execution_state})".format(
+            lang=kernel.lang,
+            kernel_id=kernel.kernel_id,
+            execution_state=kernel.execution_state)
+        view.set_status("hermes_connected_kernel", status)
+        sublime.set_timeout_async(lambda:_set_status_updater(view), 500)
+    except KeyError:
+        # When view is not connected.
+        view.set_status("hermes_connected_kernel", "")
+        return
+
+
+class HermesStatusUpdater(ViewEventListener):
+    """Listen to the heartbeat of kernel and update status of view."""
+
+    def on_activated_async(self):
+        _set_status_updater(self.view)
 
 
 class HermesCompleter(EventListener):
