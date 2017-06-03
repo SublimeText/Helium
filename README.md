@@ -86,4 +86,4 @@ TODO
     + [x] token
     + [ ] password
 
-  - [ ] Make introduction pictures.
+  - [x] Make introduction pictures.
