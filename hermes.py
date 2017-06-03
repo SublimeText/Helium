@@ -410,7 +410,7 @@ def _interrupt_kernel(
     try:
         current_kernel_id = ViewManager.get_kernel_for_view(view.buffer_id()).kernel_id
     except KeyError:
-        result = re.match(r"\*Hermes Output\* \[.*\] (\w*)", view.name())
+        result = re.match(r"\*Hermes Output\* \[.*?\] ([\w-]*)", view.name())
         if result:
             current_kernel_id = result.group(1)
         else:
