@@ -303,7 +303,11 @@ class KernelConnection(object):
         self._logger.info("Caught image.")
         for mime_data in reply.display_data:
             data = mime_data["image/png"]
-            content = '<body style="background-color:white"> <img alt="Out" src="data:image/png;base64,{data}" /> </body>'.format(
+            content = (
+                '<body style="background-color:white">' +
+                '<img alt="Out" src="data:image/png;base64,{data}" />' +
+                '</body>'
+            ).format(
                 data=data.strip(),
                 bgcolor="white")
             file_size = self.get_view().size()

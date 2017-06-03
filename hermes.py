@@ -4,7 +4,6 @@ The package provides code execution and completion in interaction with Jupyter.
 Copyright (c) 2016, NEGORO Tetsuya (https://github.com/ngr-t)
 """
 
-import time
 import json
 import re
 from functools import (partial, wraps)
@@ -380,9 +379,6 @@ def _connect_kernel(
             buffer_id=view.buffer_id(),
             kernel_id=selected_kernel["id"])
         logger.info(log_info_msg)
-        status = "Hermes: [{name}] {kernel_id}".format(
-            name=selected_kernel["name"],
-            kernel_id=selected_kernel["id"])
     _set_status_updater(view)
     continue_cb()
 
@@ -426,17 +422,13 @@ def get_block(view: sublime.View, s: sublime.Region) -> str:
     start_point = 0
     for first_row in range(current_row, -1, -1):
         indent = get_indent(view, first_row)
-        if (not indent.startswith(current_indent) or
-            get_line(view, first_row).strip() == ''
-        ):
+        if (not indent.startswith(current_indent) or get_line(view, first_row).strip() == ''):
             start_point = view.text_point(first_row + 1, 0)
             break
     end_point = view.size()
     for last_row in range(current_row, view_end_row + 1):
         indent = get_indent(view, last_row)
-        if (not indent.startswith(current_indent) or
-            get_line(view, last_row).strip() == ''
-        ):
+        if (not indent.startswith(current_indent) or get_line(view, last_row).strip() == ''):
             end_point = view.text_point(last_row, 0) - 1
             break
     block_region = sublime.Region(start_point, end_point)
@@ -494,7 +486,7 @@ def _set_status_updater(view):
             kernel_id=kernel.kernel_id,
             execution_state=kernel.execution_state)
         view.set_status("hermes_connected_kernel", status)
-        sublime.set_timeout_async(lambda:_set_status_updater(view), 500)
+        sublime.set_timeout_async(lambda: _set_status_updater(view), 500)
     except KeyError:
         # When view is not connected.
         view.set_status("hermes_connected_kernel", "")
