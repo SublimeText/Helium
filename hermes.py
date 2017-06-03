@@ -203,6 +203,20 @@ class KernelManager(object):
             manager=cls)
 
     @classmethod
+    def shutdown_kernel(cls, kernel_id):
+        url = '{base_url}/api/kernels/{kernel_id}'.format(
+            base_url=cls.base_url(),
+            kernel_id=kernel_id)
+        cls.delete_request(url)
+
+    @classmethod
+    def restart_kernel(cls, kernel_id):
+        url = '{base_url}/api/kernels/{kernel_id}/restart'.format(
+            base_url=cls.base_url(),
+            kernel_id=kernel_id)
+        cls.post_request(url, dict())
+
+    @classmethod
     def interrupt_kernel(cls, kernel_id):
         url = '{base_url}/api/kernels/{kernel_id}/interrupt'.format(
             base_url=cls.base_url(),
@@ -232,6 +246,19 @@ class KernelManager(object):
         else:
             header = dict()
         response = requests.get(
+            url,
+            headers=header)
+        return response.json()
+
+    @classmethod
+    def delete_request(cls, url):
+        if cls._token:
+            header_auth_body = "token {token}".format(
+                token=cls._token)
+            header = dict(Authorization=header_auth_body)
+        else:
+            header = dict()
+        response = requests.delete(
             url,
             headers=header)
         return response.json()
@@ -399,13 +426,7 @@ class HermesConnectKernel(TextCommand):
 
 
 @chain_callbacks
-def _interrupt_kernel(
-    window,
-    view,
-    *,
-    continue_cb=lambda: None,
-    logger=HERMES_LOGGER
-):
+def _show_kernel_selection_menu(window, view, cb):
     # Get the kernel ID related to `view` if exists.
     try:
         current_kernel_id = ViewManager.get_kernel_for_view(view.buffer_id()).kernel_id
@@ -428,15 +449,26 @@ def _interrupt_kernel(
         else "[{lang}] {kernel_id}".format(lang=kernel["name"], kernel_id=kernel["id"])
         for kernel
         in kernel_list]
-
     index = yield partial(
         window.show_quick_panel,
         menu_items)
-
     if index == -1:
-        return
+        selected_kernel = None
     else:
         selected_kernel = kernel_list[index]
+    cb(selected_kernel)
+
+
+@chain_callbacks
+def _interrupt_kernel(
+    window,
+    view,
+    *,
+    continue_cb=lambda: None,
+    logger=HERMES_LOGGER
+):
+    selected_kernel = yield partial(_show_kernel_selection_menu, window, view)
+    if selected_kernel is not None:
         KernelManager.interrupt_kernel(
             selected_kernel["id"])
         log_info_msg = (
@@ -452,6 +484,60 @@ class HermesInterruptKernel(TextCommand):
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
         _interrupt_kernel(sublime.active_window(), self.view, logger=logger)
+
+
+@chain_callbacks
+def _restart_kernel(
+    window,
+    view,
+    *,
+    continue_cb=lambda: None,
+    logger=HERMES_LOGGER
+):
+    selected_kernel = yield partial(_show_kernel_selection_menu, window, view)
+    if selected_kernel is not None:
+        KernelManager.restart_kernel(
+            selected_kernel["id"])
+        log_info_msg = (
+            "Interrupted kernel {kernel_id}.").format(
+            kernel_id=selected_kernel["id"])
+        logger.info(log_info_msg)
+    continue_cb()
+
+
+class HermesRestartKernel(TextCommand):
+    """Set url of jupyter process."""
+
+    def run(self, edit, *, logger=HERMES_LOGGER):
+        """Command definition."""
+        _restart_kernel(sublime.active_window(), self.view, logger=logger)
+
+
+@chain_callbacks
+def _shutdown_kernel(
+    window,
+    view,
+    *,
+    continue_cb=lambda: None,
+    logger=HERMES_LOGGER
+):
+    selected_kernel = yield partial(_show_kernel_selection_menu, window, view)
+    if selected_kernel is not None:
+        KernelManager.shutdown_kernel(
+            selected_kernel["id"])
+        log_info_msg = (
+            "Interrupted kernel {kernel_id}.").format(
+            kernel_id=selected_kernel["id"])
+        logger.info(log_info_msg)
+    continue_cb()
+
+
+class HermesShutdownKernel(TextCommand):
+    """Set url of jupyter process."""
+
+    def run(self, edit, *, logger=HERMES_LOGGER):
+        """Command definition."""
+        _shutdown_kernel(sublime.active_window(), self.view, logger=logger)
 
 
 def get_line(view: sublime.View, row: int) -> str:

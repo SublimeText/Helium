@@ -8,6 +8,14 @@
     "command": "hermes_start_kernel"
   },
   {
+    "caption": "Hermes: Shutdown Kernel",
+    "command": "hermes_shutdown_kernel"
+  },
+  {
+    "caption": "Hermes: Restart Kernel",
+    "command": "hermes_restart_kernel"
+  },
+  {
     "caption": "Hermes: Interrupt Kernel",
     "command": "hermes_interrupt_kernel"
   },
