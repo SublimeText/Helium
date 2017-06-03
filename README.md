@@ -79,6 +79,7 @@ TODO
   - [ ] Enable object inspection to be shown in panel and popup.
   - [ ] Implement output as inline Phantom like LightTable or Hydrogen.
   - [ ] Function to stop a kernel.
+  - [x] Function to interupt a kernel.
   - [x] Show the connected kernel in status bar.
   - [ ] Authentication.
 

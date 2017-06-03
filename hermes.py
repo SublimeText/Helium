@@ -203,6 +203,13 @@ class KernelManager(object):
             manager=cls)
 
     @classmethod
+    def interrupt_kernel(cls, kernel_id):
+        url = '{base_url}/api/kernels/{kernel_id}/interrupt'.format(
+            base_url=cls.base_url(),
+            kernel_id=kernel_id)
+        cls.post_request(url, dict())
+
+    @classmethod
     def post_request(cls, url, data):
         if cls._token:
             header_auth_body = "token {token}".format(
@@ -389,6 +396,62 @@ class HermesConnectKernel(TextCommand):
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
         _connect_kernel(sublime.active_window(), self.view, logger=logger)
+
+
+@chain_callbacks
+def _interrupt_kernel(
+    window,
+    view,
+    *,
+    continue_cb=lambda: None,
+    logger=HERMES_LOGGER
+):
+    # Get the kernel ID related to `view` if exists.
+    try:
+        current_kernel_id = ViewManager.get_kernel_for_view(view.buffer_id()).kernel_id
+    except KeyError:
+        result = re.match(r"\*Hermes Output\* \[.*\] (\w*)", view.name())
+        if result:
+            current_kernel_id = result.group(1)
+        else:
+            current_kernel_id = ""
+    try:
+        kernel_list = KernelManager.list_kernels()
+    except (requests.RequestException, AttributeError):
+        sublime.message_dialog("Set URL first, please.")
+        yield lambda cb: _set_url(window, continue_cb=cb)
+        kernel_list = KernelManager.list_kernels()
+
+    menu_items = [
+        "[{lang}] {kernel_id} (connected to this view)".format(lang=kernel["name"], kernel_id=kernel["id"])
+        if kernel["id"] == current_kernel_id
+        else "[{lang}] {kernel_id}".format(lang=kernel["name"], kernel_id=kernel["id"])
+        for kernel
+        in kernel_list]
+
+    index = yield partial(
+        window.show_quick_panel,
+        menu_items)
+
+    if index == -1:
+        return
+    else:
+        selected_kernel = kernel_list[index]
+        KernelManager.interrupt_kernel(
+            selected_kernel["id"])
+        log_info_msg = (
+            "Interrupted kernel {kernel_id}.").format(
+            kernel_id=selected_kernel["id"])
+        logger.info(log_info_msg)
+    continue_cb()
+
+
+class HermesInterruptKernel(TextCommand):
+    """Set url of jupyter process."""
+
+    def run(self, edit, *, logger=HERMES_LOGGER):
+        """Command definition."""
+        _interrupt_kernel(sublime.active_window(), self.view, logger=logger)
 
 
 def get_line(view: sublime.View, row: int) -> str:
