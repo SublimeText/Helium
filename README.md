@@ -73,7 +73,7 @@ TODO
 
     - [x] Use selection.
 
-  - [ ] Enable to handle `stdin_request`.
+  - [x] Enable to handle `stdin_request`.
   - [x] Enable to toggle if completions are shown.
   - [ ] Moving cursor on execution.
   - [ ] Enable object inspection to be shown in panel and popup.
