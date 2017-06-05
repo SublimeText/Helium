@@ -16,8 +16,11 @@ from datetime import datetime
 import re
 
 from websocket import create_connection
-
 import sublime
+
+from .utils import (
+    show_password_input,
+)
 
 
 JUPYTER_PROTOCOL_VERSION = '5.0'
@@ -32,6 +35,8 @@ MSG_TYPE_EXECUTE_REPLY = 'execute_reply'
 MSG_TYPE_COMPLETE_REQUEST = 'complete_request'
 MSG_TYPE_COMPLETE_REPLY = 'complete_reply'
 MSG_TYPE_DISPLAY_DATA = 'display_data'
+MSG_TYPE_INPUT_REQUEST = "input_request"
+MSG_TYPE_INPUT_REPLY = "input_reply"
 MSG_TYPE_ERROR = 'error'
 MSG_TYPE_STREAM = 'stream'
 MSG_TYPE_STATUS = 'status'
@@ -231,14 +236,7 @@ class KernelConnection(object):
             lang=self.lang,
             kernel_id=self.kernel_id)
 
-    def _communicate(self, message, timeout=None) -> JupyterReply:
-        """Send `message` to the kernel and return `reply` for it."""
-        # Use `create_connection`'s default value unless `timeout` is set.
-        if timeout is not None:
-            connect_kwargs = dict(timeout=timeout)
-        else:
-            connect_kwargs = dict()
-
+    def _create_connection(self, connect_kwargs):
         if self._auth_type == "no_auth":
             sock = create_connection(
                 self._ws_url,
@@ -255,10 +253,24 @@ class KernelConnection(object):
             sock = create_connection(
                 self._ws_url,
                 header=header)
+        return sock
 
+    def _communicate(self, message, timeout=None) -> JupyterReply:
+        """Send `message` to the kernel and return `reply` for it."""
+        # Use `create_connection`'s default value unless `timeout` is set.
+        if timeout is not None:
+            connect_kwargs = dict(timeout=timeout)
+        else:
+            connect_kwargs = dict()
+
+        sock = self._create_connection(connect_kwargs)
         sock.send(json.dumps(message).encode())
         replies = []
         while True:
+            # The code here requires refactoring.
+            # The code to interpret reply messages is devided into here and `JupyterReply` class.
+            # Maybe it's better choice to remove `JupyterReply` class and
+            # let all message interpretation processed here.
             reply = json.loads(sock.recv())
             replies.append(reply)
             self._logger.info(reply)
@@ -267,6 +279,34 @@ class KernelConnection(object):
                 self._execution_state = reply["content"]["execution_state"]
                 if self._execution_state == 'idle':
                     break
+            elif msg_type == MSG_TYPE_INPUT_REQUEST:
+                content = reply["content"]
+
+                def send_input(value):
+                    input_reply = dict(
+                        header=self._gen_header(MSG_TYPE_INPUT_REPLY),
+                        parent_header=reply["header"],
+                        content=dict(value=value),
+                        channel='stdin',
+                        metadata={},
+                        buffers={})
+                    sock.send(json.dumps(input_reply).encode())
+
+                prompt = content["prompt"]
+                if content["password"]:
+                    show_password_input(prompt, send_input)
+                else:
+                    (
+                        sublime
+                        .active_window()
+                        .show_input_panel(
+                            prompt,
+                            "",
+                            send_input,
+                            lambda x: None,
+                            lambda: None)
+                    )
+
         reply_obj = JupyterReply(replies, logger=self._logger)
         return reply_obj
 
@@ -402,7 +442,7 @@ class KernelConnection(object):
             silent=False,
             store_history=True,
             user_expressions={},
-            allow_stdin=False)
+            allow_stdin=True)
         message = dict(
             header=header,
             parent_header={},

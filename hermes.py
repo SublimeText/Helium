@@ -20,6 +20,8 @@ from .kernel import KernelConnection
 import requests
 from websocket import WebSocketTimeoutException
 
+from .utils import chain_callbacks
+
 # Logger setting
 HERMES_LOGGER = getLogger(__name__)
 HANDLER = StreamHandler()
@@ -31,34 +33,6 @@ if len(HERMES_LOGGER.handlers) == 0:
 
 # Regex patterns to extract code lines.
 INDENT_PATTERN = re.compile(r"^([ \t]*)")
-
-
-def chain_callbacks(f):
-    # type: Callable[..., Generator[Callable[Callable[...], Any, Any]] -> Callable[..., Any]
-    """Decorator to enable mimicing promise pattern by yield expression.
-
-    Decorator function to make a wrapper which executes functions
-    yielded by the given generator in order."""
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        chain = f(*args, **kwargs)
-        try:
-            next_f = next(chain)
-        except StopIteration:
-            return
-
-        def cb(*args, **kwargs):
-            nonlocal next_f
-            try:
-                if len(args) + len(kwargs) != 0:
-                    next_f = chain.send(*args, **kwargs)
-                else:
-                    next_f = next(chain)
-                next_f(cb)
-            except StopIteration:
-                return
-        next_f(cb)
-    return wrapper
 
 
 class ViewManager(object):
