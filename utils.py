@@ -63,7 +63,6 @@ def show_password_input(prompt, cb):
             # When there are characters other than "*"
             pre, new, post = matches.group(1, 2, 3)
             hidden_input = hidden_input[:len(pre)] + new + hidden_input[len(hidden_input)-len(post):len(hidden_input)]
-            new_region = sublime.Region(len(pre), len(pre) + len(new))
             view.run_command("mask_input_panel_text")
         else:
             try:

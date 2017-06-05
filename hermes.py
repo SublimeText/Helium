@@ -6,7 +6,7 @@ Copyright (c) 2016, NEGORO Tetsuya (https://github.com/ngr-t)
 
 import json
 import re
-from functools import (partial, wraps)
+from functools import partial
 from logging import getLogger, INFO, StreamHandler
 
 import sublime
