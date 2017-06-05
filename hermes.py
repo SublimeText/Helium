@@ -255,12 +255,12 @@ def _set_url(window, *, continue_cb=lambda: None):
         return
     elif connection_id == len(connection_menu_items) - 1:
         # When 'new' is chosen.
-        url = yield partial(
-            window.show_input_panel,
+        url = yield lambda cb: window.show_input_panel(
             'URL: ',
             '',
-            on_change=None,
-            on_cancel=None)
+            cb,
+            on_change=lambda x: None,
+            on_cancel=lambda: None)
     else:
         url = connections[connection_id]["url"]
     try:
@@ -270,7 +270,7 @@ def _set_url(window, *, continue_cb=lambda: None):
             "token",
             "",
             cb,
-            lambda: None,
+            lambda x: None,
             lambda: None)
     if token:
         KernelManager.set_url(url, token=token)
@@ -473,7 +473,7 @@ def _restart_kernel(
         KernelManager.restart_kernel(
             selected_kernel["id"])
         log_info_msg = (
-            "Interrupted kernel {kernel_id}.").format(
+            "Restarted kernel {kernel_id}.").format(
             kernel_id=selected_kernel["id"])
         logger.info(log_info_msg)
     continue_cb()
@@ -500,7 +500,7 @@ def _shutdown_kernel(
         KernelManager.shutdown_kernel(
             selected_kernel["id"])
         log_info_msg = (
-            "Interrupted kernel {kernel_id}.").format(
+            "Shutdown kernel {kernel_id}.").format(
             kernel_id=selected_kernel["id"])
         logger.info(log_info_msg)
     continue_cb()
