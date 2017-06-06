@@ -76,7 +76,9 @@ TODO
   - [x] Enable to handle `stdin_request`.
   - [x] Enable to toggle if completions are shown.
   - [ ] Moving cursor on execution.
-  - [ ] Enable object inspection to be shown in panel and popup.
+  - [ ] Enable object inspection to be shown
+    + [x] in panel.
+    + [ ] in popup.
   - [ ] Implement output as inline Phantom like LightTable or Hydrogen.
   - [x] Function to stop a kernel.
   - [x] Function to restart a kernel.

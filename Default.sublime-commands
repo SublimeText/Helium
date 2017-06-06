@@ -26,5 +26,9 @@
   {
     "caption": "Hermes: Execute Block",
     "command": "hermes_execute_block"
+  },
+  {
+    "caption": "Hermes: Get Object Inspection",
+    "command": "hermes_get_object_inspection"
   }
 ]

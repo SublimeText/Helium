@@ -35,6 +35,8 @@ MSG_TYPE_EXECUTE_REPLY = 'execute_reply'
 MSG_TYPE_COMPLETE_REQUEST = 'complete_request'
 MSG_TYPE_COMPLETE_REPLY = 'complete_reply'
 MSG_TYPE_DISPLAY_DATA = 'display_data'
+MSG_TYPE_INSPECT_REQUEST = "inspect_request"
+MSG_TYPE_INSPECT_REPLY = "inspect_reply"
 MSG_TYPE_INPUT_REQUEST = "input_request"
 MSG_TYPE_INPUT_REPLY = "input_reply"
 MSG_TYPE_ERROR = 'error'
@@ -45,6 +47,8 @@ HERMES_FIGURE_PHANTOMS = "hermes_figure_phantoms"
 
 # Used as key of status bar.
 KERNEL_STATUS_KEY = "hermes_kernel_status"
+
+HERMES_OBJECT_INSPECT_PANEL = "hermes_object_inspect"
 
 ANSI_ESCAPE_PATTERN = re.compile(r'\x1b[^m]*m')
 
@@ -94,8 +98,14 @@ class JupyterReply(object):
             # switch by msg_type.
             if msg_type.endswith("_reply"):
                 self._status = content["status"]
-                if msg_type == MSG_TYPE_COMPLETE_REPLY:
-                    self._matches = content["matches"]
+            if msg_type == MSG_TYPE_COMPLETE_REPLY:
+                self._matches = content["matches"]
+            elif msg_type == MSG_TYPE_INSPECT_REPLY:
+                found = content["found"]
+                if found:
+                    self._inspect_data = content["data"]
+                else:
+                    self._inspect_data = "No object inspection found."
             elif msg_type == MSG_TYPE_ERROR:
                 self._ename = content["ename"]
                 self._evalue = content["evalue"]
@@ -163,6 +173,10 @@ class JupyterReply(object):
     @property
     def matches(self):
         return self._matches
+
+    @property
+    def inspect_data(self):
+        return self._inspect_data
 
 
 class KernelConnection(object):
@@ -266,6 +280,7 @@ class KernelConnection(object):
         sock = self._create_connection(connect_kwargs)
         sock.send(json.dumps(message).encode())
         replies = []
+        replied = False
         while True:
             # The code here requires refactoring.
             # The code to interpret reply messages is devided into here and `JupyterReply` class.
@@ -275,9 +290,14 @@ class KernelConnection(object):
             replies.append(reply)
             self._logger.info(reply)
             msg_type = get_msg_type(reply)
+            if msg_type.endswith("_reply"):
+                # Kernel sends status first, or XX_reply first?
+                if self._execution_state == 'idle':
+                    break
+                replied = True
             if msg_type == MSG_TYPE_STATUS:
                 self._execution_state = reply["content"]["execution_state"]
-                if self._execution_state == 'idle':
+                if self._execution_state == 'idle' and replied:
                     break
             elif msg_type == MSG_TYPE_INPUT_REQUEST:
                 content = reply["content"]
@@ -398,6 +418,22 @@ class KernelConnection(object):
             # Just there is no error.
             pass
 
+    def _handle_inspect_reply(self, reply: JupyterReply):
+        window = sublime.active_window()
+        if window.find_output_panel(HERMES_OBJECT_INSPECT_PANEL) is not None:
+            window.destroy_output_panel(HERMES_OBJECT_INSPECT_PANEL)
+        view = window.create_output_panel(HERMES_OBJECT_INSPECT_PANEL)
+        try:
+            text = remove_ansi_escape(reply.inspect_data["text/plain"])
+            view.run_command(
+                'append',
+                {'characters': text})
+            window.run_command(
+                'show_panel',
+                dict(panel="output." + HERMES_OBJECT_INSPECT_PANEL))
+        except KeyError:
+            pass
+
     def _write_to_view(self, text: str) -> None:
         self.activate_view()
         view = self.get_view()
@@ -480,3 +516,24 @@ class KernelConnection(object):
             buffers={})
         reply = self._communicate(message, timeout)
         return reply.matches
+
+    def get_inspection(self, code, cursor_pos, detail_level=0, timeout=None):
+        """Get object inspection by sending a `inspect_request` message to kernel."""
+        header = self._gen_header(MSG_TYPE_INSPECT_REQUEST)
+        content = dict(
+            code=code,
+            cursor_pos=cursor_pos,
+            detail_level=detail_level,
+            silent=False,
+            store_history=False,
+            user_expressions={},
+            allow_stdin=False)
+        message = dict(
+            header=header,
+            parent_header={},
+            channel='shell',
+            content=content,
+            metadata={},
+            buffers={})
+        reply = self._communicate(message, timeout)
+        self._handle_inspect_reply(reply)

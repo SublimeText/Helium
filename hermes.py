@@ -526,7 +526,7 @@ def get_indent(view: sublime.View, row: int) -> str:
     return INDENT_PATTERN.match(line).group()
 
 
-def get_block(view: sublime.View, s: sublime.Region) -> str:
+def get_block(view: sublime.View, s: sublime.Region) -> (str, sublime.Region):
     """Get the code block under the cursor.
 
     The code block is the lines satisfying the following conditions:
@@ -555,7 +555,7 @@ def get_block(view: sublime.View, s: sublime.Region) -> str:
             end_point = view.text_point(last_row, 0) - 1
             break
     block_region = sublime.Region(start_point, end_point)
-    return view.substr(block_region)
+    return (view.substr(block_region), block_region)
 
 
 def get_chunk(view: sublime.View, s: sublime.Region) -> str:
@@ -579,7 +579,7 @@ def _execute_block(view, *, logger=HERMES_LOGGER):
 
     pre_code = []
     for s in view.sel():
-        code = get_block(view, s)
+        code, _ = get_block(view, s)
         if code == pre_code:
             continue
         kernel.execute_code(code)
@@ -621,6 +621,36 @@ class HermesStatusUpdater(ViewEventListener):
 
     def on_activated_async(self):
         _set_status_updater(self.view)
+
+
+class HermesGetObjectInspection(TextCommand):
+    """Get object inspection."""
+
+    @chain_callbacks
+    def run(self, edit, *, logger=HERMES_LOGGER):
+        view = self.view
+        try:
+            kernel = ViewManager.get_kernel_for_view(view.buffer_id())
+        except KeyError:
+            sublime.message_dialog("No kernel is connected to this view.")
+            yield lambda cb: _connect_kernel(
+                sublime.active_window(),
+                view,
+                continue_cb=cb)
+            kernel = ViewManager.get_kernel_for_view(view.buffer_id())
+
+        pre_code = []
+        for s in view.sel():
+            code, region = get_block(view, s)
+            cursor_pos = s.end() - region.begin()
+            if code == pre_code:
+                continue
+            kernel.get_inspection(code, cursor_pos)
+            log_info_msg = "Requested object inspection for code {code} with kernel {kernel_id}".format(
+                code=code,
+                kernel_id=kernel.kernel_id)
+            logger.info(log_info_msg)
+            pre_code = code
 
 
 class HermesCompleter(EventListener):
