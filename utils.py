@@ -46,13 +46,13 @@ class MaskInputPanelText(TextCommand):
         self.view.replace(edit, region, s * "*")
 
 
-def show_password_input(prompt, cb):
+def show_password_input(prompt, on_done, on_cancel):
     hidden_input = ""
     view = None
 
     def get_hidden_input(user_input):
         nonlocal hidden_input
-        cb(hidden_input)
+        on_done(hidden_input)
 
     def hide_input(user_input):
         nonlocal view
@@ -80,5 +80,5 @@ def show_password_input(prompt, cb):
             "",
             get_hidden_input,
             hide_input,
-            lambda: None)
+            on_cancel)
     )

@@ -313,8 +313,13 @@ class KernelConnection(object):
                     sock.send(json.dumps(input_reply).encode())
 
                 prompt = content["prompt"]
+
+                def interrupt():
+                    self.manager.interrupt_kernel(self.kernel_id)
+
                 if content["password"]:
-                    show_password_input(prompt, send_input)
+                    show_password_input(prompt, send_input, interrupt)
+
                 else:
                     (
                         sublime
@@ -324,7 +329,8 @@ class KernelConnection(object):
                             "",
                             send_input,
                             lambda x: None,
-                            lambda: None)
+                            interrupt
+                        )
                     )
 
         reply_obj = JupyterReply(replies, logger=self._logger)
