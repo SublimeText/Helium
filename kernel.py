@@ -366,20 +366,30 @@ class KernelConnection(object):
         #     view_output = "Saved the figure to '{out_file}'.\n".format(
         #         out_file=out_file.name)
         #     self._write_to_view(view_output)
-        self._logger.info("Caught image.")
         for mime_data in reply.display_data:
-            data = mime_data["image/png"]
-            content = (
-                '<body style="background-color:white">' +
-                '<img alt="Out" src="data:image/png;base64,{data}" />' +
-                '</body>'
-            ).format(
-                data=data.strip(),
-                bgcolor="white")
-            file_size = self.get_view().size()
-            region = sublime.Region(file_size, file_size)
-            self.get_view().add_phantom(HERMES_FIGURE_PHANTOMS, region, content, sublime.LAYOUT_BLOCK)
-            self._logger.info("Created phantom {}".format(content))
+            if "image/png" in mime_data:
+                data = mime_data["image/png"]
+                self._logger.info("Caught image.")
+                content = (
+                    '<body style="background-color:white">' +
+                    '<img alt="Out" src="data:image/png;base64,{data}" />' +
+                    '</body>'
+                ).format(
+                    data=data.strip(),
+                    bgcolor="white")
+                file_size = self.get_view().size()
+                region = sublime.Region(file_size, file_size)
+                self.get_view().add_phantom(
+                    HERMES_FIGURE_PHANTOMS,
+                    region,
+                    content,
+                    sublime.LAYOUT_BLOCK)
+                self._logger.info("Created phantom {}".format(content))
+            if "text/markdown" in mime_data:
+                # Some kernel (such as IRkernel) sends text in display_data.
+                result = mime_data["text/markdown"]
+                lines = "\n(display data): {result}".format(result=result)
+                self._write_to_view(lines)
 
     def _output_input_code(self, code, execution_count):
         line = "In[{execution_count}]: {code}".format(
