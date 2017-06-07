@@ -12,4 +12,5 @@
      * }
     */
   ],
+  "username": "" // You can set username in header of messages to kernels.
 }

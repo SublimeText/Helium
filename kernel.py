@@ -207,6 +207,7 @@ class KernelConnection(object):
         lang,
         kernel_id,
         manager,
+        username=None,
         auth_type=("no_auth", "password", "token")[0],
         *,
         auth_info=None,
@@ -232,6 +233,12 @@ class KernelConnection(object):
         self._auth_type = auth_type
         self._auth_info = auth_info
         self._token = token
+        self._session = uuid4().hex
+        if username is None:
+            self._username = (
+                sublime
+                .load_settings("Hermes.sublime-settings")
+                .get("username", ""))
 
     @property
     def lang(self):
@@ -345,7 +352,9 @@ class KernelConnection(object):
             kernel_id=self.kernel_id,
             msg_id=uuid4().hex,
             datetime=datetime.now().isoformat(),
-            msg_type=msg_type
+            msg_type=msg_type,
+            username=self._username,
+            session=self._session
         )
 
     def activate_view(self):
