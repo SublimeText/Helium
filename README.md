@@ -77,8 +77,7 @@ TODOs
 
   - [ ] Moving cursor on execution.
   - [ ] Rearrange log messages. Make option to set logging level.
-  - [ ] Add install message.
-  - [ ] There seems to be situations that kernel returns `text/html` or `text/markdown` but not `text/plain`. How to deal with it?
   - [ ] Enable object inspection to be shown in popup.
   - [ ] Implement output as inline Phantom like LightTable or Hydrogen.
   - [ ] Password authentication.
+
