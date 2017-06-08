@@ -98,8 +98,11 @@ class KernelManager(object):
         """
         base_url = base_url.rstrip("/")
         if base_ws_url is None:
-            _, _, url_body = base_url.partition("://")
-            base_ws_url = "ws://" + url_body
+            protocol, _, url_body = base_url.partition("://")
+            if protocol == "https":
+                base_ws_url = "wss://" + url_body
+            else:
+                base_ws_url = "ws://" + url_body
         else:
             base_ws_url = base_ws_url.rstrip("/")
         cls._base_url = base_url
