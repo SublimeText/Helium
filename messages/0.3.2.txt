@@ -1,0 +1,4 @@
+Update in 0.3.2
+---------------
+
+  - Use wss for https connections. This enables Hermes to connect Jupyterhub server using token. See https://github.com/ngr-t/SublimeHermes/issues/1 for details. (Thanks to @randy3k)
