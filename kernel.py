@@ -366,55 +366,11 @@ class KernelConnection(object):
         view.settings().set("word_wrap", "false")
         sublime.active_window().focus_view(current_view)
 
-    def _handle_display_data(self, reply: JupyterReply) -> None:
-        # import base64
-        # import tempfile
-        # decoded = base64.b64decode(data)
-        # with tempfile.TemporaryFile(delete=False, suffix=".png") as out_file:
-        #     out_file.write(decoded)
-        #     view_output = "Saved the figure to '{out_file}'.\n".format(
-        #         out_file=out_file.name)
-        #     self._write_to_view(view_output)
-        for mime_data in reply.display_data:
-            if "image/png" in mime_data:
-                data = mime_data["image/png"]
-                self._logger.info("Caught image.")
-                content = (
-                    '<body style="background-color:white">' +
-                    '<img alt="Out" src="data:image/png;base64,{data}" />' +
-                    '</body>'
-                ).format(
-                    data=data.strip(),
-                    bgcolor="white")
-                file_size = self.get_view().size()
-                region = sublime.Region(file_size, file_size)
-                self.get_view().add_phantom(
-                    HERMES_FIGURE_PHANTOMS,
-                    region,
-                    content,
-                    sublime.LAYOUT_BLOCK)
-                self._logger.info("Created phantom {}".format(content))
-            if "text/markdown" in mime_data:
-                # Some kernel (such as IRkernel) sends text in display_data.
-                result = mime_data["text/markdown"]
-                lines = "\n(display data): {result}".format(result=result)
-                self._write_to_view(lines)
-
     def _output_input_code(self, code, execution_count):
         line = "In[{execution_count}]: {code}".format(
             execution_count=execution_count,
             code=code)
-        self._write_to_view(line)
-
-    def _handle_result_text(self, reply: JupyterReply) -> None:
-        try:
-            # lines = "\n\033[1;31mOut[{execution_count}]:\033[0m {result}".format(
-            lines = "\nOut[{execution_count}]: {result}".format(
-                execution_count=reply.execution_count,
-                result=reply.execute_result["text/plain"])
-            self._write_to_view(lines)
-        except KeyError:
-            pass
+        self._write_text_to_view(line)
 
     def _handle_error(self, reply: JupyterReply) -> None:
         try:
@@ -423,7 +379,7 @@ class KernelConnection(object):
                 ename=reply.ename,
                 evalue=reply.evalue,
                 traceback="\n".join(reply.traceback))
-            self._write_to_view(remove_ansi_escape(lines))
+            self._write_text_to_view(remove_ansi_escape(lines))
         except AttributeError:
             # Just there is no error.
             pass
@@ -438,7 +394,7 @@ class KernelConnection(object):
                 lines += ["\n(stderr):"] + reply.stream_stderr
             if len(reply.stream_other) > 0:
                 lines += ["\n(other stream):"] + reply.stream_other
-            self._write_to_view("\n".join(lines))
+            self._write_text_to_view("\n".join(lines))
         except AttributeError:
             # Just there is no error.
             pass
@@ -459,7 +415,10 @@ class KernelConnection(object):
         except KeyError:
             pass
 
-    def _write_to_view(self, text: str) -> None:
+    def _write_out_execution_count(self, reply: JupyterReply) -> None:
+        self._write_text_to_view("\nOut[{}]: ".format(reply.execution_count))
+
+    def _write_text_to_view(self, text: str) -> None:
         self.activate_view()
         view = self.get_view()
         view.set_read_only(False)
@@ -467,6 +426,45 @@ class KernelConnection(object):
             'append',
             {'characters': text})
         view.set_read_only(True)
+
+    def _write_phantom(self, content: str):
+        file_size = self.get_view().size()
+        region = sublime.Region(file_size, file_size)
+        self.get_view().add_phantom(
+            HERMES_FIGURE_PHANTOMS,
+            region,
+            content,
+            sublime.LAYOUT_BLOCK)
+        self._logger.info("Created phantom {}".format(content))
+
+    def _write_mime_data_to_view(self, mime_data: dict) -> None:
+        self.activate_view()
+        if "text/plain" in mime_data:
+            # Some kernel (such as IRkernel) sends text in display_data.
+            result = mime_data["text/plain"]
+            lines = "\n(display data): {result}".format(result=result)
+            self._write_text_to_view(lines)
+        elif "text/markdown" in mime_data:
+            # Some kernel (such as IRkernel) sends text in display_data.
+            result = mime_data["text/markdown"]
+            lines = "\n(display data): {result}".format(result=result)
+            self._write_text_to_view(lines)
+        elif "text/html" in mime_data:
+            # Some kernel (such as IRkernel) sends text in display_data.
+            self._logger.info("Caught 'text/html' output without plain text. Try to show with phantom.")
+            content = mime_data["text/html"]
+            self._write_phantom(content)
+        if "image/png" in mime_data:
+            data = mime_data["image/png"]
+            self._logger.info("Caught image.")
+            content = (
+                '<body style="background-color:white">' +
+                '<img alt="Out" src="data:image/png;base64,{data}" />' +
+                '</body>'
+            ).format(
+                data=data.strip(),
+                bgcolor="white")
+            self._write_phantom(content)
 
     def update_status_bar(self):
         self._communicate()
@@ -489,13 +487,15 @@ class KernelConnection(object):
         def callback(reply):
             try:
                 self._output_input_code(code, reply.execution_count)
+                self._write_out_execution_count(reply)
                 self._handle_stream(reply)
-                self._handle_display_data(reply)
+                for mime_data in reply.display_data:
+                    self._write_mime_data_to_view(mime_data)
+                self._write_mime_data_to_view(reply.execute_result)
                 self._handle_error(reply)
-                self._handle_result_text(reply)
             finally:
                 # Separator should be written if an undealt error occur while handling reply.
-                self._write_to_view("\n\n" + OUTPUT_VIEW_SEPARATOR + "\n\n")
+                self._write_text_to_view("\n\n" + OUTPUT_VIEW_SEPARATOR + "\n\n")
 
         header = self._gen_header(MSG_TYPE_EXECUTE_REQUEST)
         content = dict(
