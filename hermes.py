@@ -358,6 +358,71 @@ class HermesStartKernel(TextCommand):
 
 
 @chain_callbacks
+def _list_kernels(window, view, *, logger=HERMES_LOGGER):
+    selected_kernel = yield partial(_show_kernel_selection_menu, window, view)
+    subcommands = [
+        "Connect",
+        "Rename",
+        "Interrupt",
+        "Restart",
+        "Shutdown"
+    ]
+    index = yield partial(window.show_quick_panel, subcommands)
+    if index == 0:
+        # Connect
+        ViewManager.connect_kernel(
+            view.buffer_id(),
+            selected_kernel["name"],
+            selected_kernel["id"])
+        if view.file_name():
+            view_name = view.file_name()
+        else:
+            view_name = view.name()
+        log_info_msg = (
+            "Connected view '{view_name}(id: {buffer_id})'"
+            "to kernel {kernel_id}.").format(
+            view_name=view_name,
+            buffer_id=view.buffer_id(),
+            kernel_id=selected_kernel["id"])
+        logger.info(log_info_msg)
+    elif index == 1:
+        # Rename
+        raise NotImplementedError
+    elif index == 2:
+        # Interrupt
+        KernelManager.interrupt_kernel(
+            selected_kernel["id"])
+        log_info_msg = (
+            "Interrupted kernel {kernel_id}.").format(
+            kernel_id=selected_kernel["id"])
+        logger.info(log_info_msg)
+    elif index == 3:
+        # Restart
+        KernelManager.restart_kernel(
+            selected_kernel["id"])
+        log_info_msg = (
+            "Restarted kernel {kernel_id}.").format(
+            kernel_id=selected_kernel["id"])
+        logger.info(log_info_msg)
+    elif index == 4:
+        KernelManager.shutdown_kernel(
+            selected_kernel["id"])
+        log_info_msg = (
+            "Shutdown kernel {kernel_id}.").format(
+            kernel_id=selected_kernel["id"])
+        logger.info(log_info_msg)
+
+    _set_status_updater(view)
+
+
+class HermesListKernels(TextCommand):
+    """Command that shows the list of kernels and do some action for chosen kernels."""
+
+    def run(self, edit, *, logger=HERMES_LOGGER):
+        _list_kernels(sublime.active_window(), self.view)
+
+
+@chain_callbacks
 def _connect_kernel(
     window,
     view,
@@ -419,7 +484,7 @@ class HermesConnectKernel(TextCommand):
 
 @chain_callbacks
 def _show_kernel_selection_menu(window, view, cb):
-    # Get the kernel ID related to `view` if exists.
+    # Get the kurnel ID related to `view` if exists.
     try:
         current_kernel_id = ViewManager.get_kernel_for_view(view.buffer_id()).kernel_id
     except KeyError:

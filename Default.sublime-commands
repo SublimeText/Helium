@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 [
   {
     "caption": "Hermes: Connect Kernel",
@@ -28,6 +29,10 @@
     "command": "hermes_execute_block"
   },
   {
+    "caption": "Hermes: List Kernels",
+    "command": "hermes_list_kernels"
+  },
+  {
     "caption": "Hermes: Get Object Inspection",
     "command": "hermes_get_object_inspection"
   },
@@ -39,4 +44,3 @@
       "default": "{\n  \"connections\": [\n    $0\n  ]\n}"
     }
   },
-]
