@@ -1,0 +1,5 @@
+Update in 0.3.3
+---------------
+
+  - Fixed issue #3. Now `text/plain` type data are primarily used when `display_data` are written to the view.
+  - Fixed issue #5. `text/html` type data are shown with in phantoms unless there `text/plain` or `text/markdown` type exist in output data.
