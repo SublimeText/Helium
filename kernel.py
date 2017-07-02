@@ -212,7 +212,8 @@ class KernelConnection(object):
         *,
         auth_info=None,
         token=None,
-        logger=None
+        logger=None,
+        connection_name=None
     ):
         """Initialize KernelConnection class.
 
@@ -236,6 +237,7 @@ class KernelConnection(object):
         self._auth_info = auth_info
         self._token = token
         self._execution_state = 'unknown'
+        self._connection_name = connection_name
         if username is None:
             self._username = (
                 sublime
@@ -252,12 +254,42 @@ class KernelConnection(object):
         """ID of kernel."""
         return self._kernel_id
 
+    def get_connection_name(self):
+        return self._connection_name
+
+    def set_connection_name(self, new_name):
+        # We also have to change the view name now.
+        view = self.get_view()
+        self._connection_name = new_name
+        view.set_name(self.view_name)
+
+    def del_connection_name(self):
+        self._connection_name = None
+
+    connection_name = property(
+        get_connection_name,
+        set_connection_name,
+        del_connection_name,
+        "Name of kernel connection shown in a view title.")
+
     @property
     def view_name(self):
         """The name of output view."""
-        return "*Hermes Output* [{lang}] {kernel_id}".format(
-            lang=self.lang,
-            kernel_id=self.kernel_id)
+        return "*Hermes Output* {repr}".format(repr=self.repr)
+
+    @property
+    def repr(self):
+        """A string used as the representation of the connection"""
+        if self.connection_name:
+            return "{connection_name} ([{lang}] {kernel_id})".format(
+                connection_name=self.connection_name,
+                lang=self.lang,
+                kernel_id=self.kernel_id)
+        else:
+            return "[{lang}] {kernel_id}".format(
+                lang=self.lang,
+                kernel_id=self.kernel_id)
+
 
     def _create_connection(self, connect_kwargs=dict()):
         if self._auth_type == "no_auth":

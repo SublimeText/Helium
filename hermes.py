@@ -147,14 +147,14 @@ class KernelManager(object):
         return cls.get_request(url)
 
     @classmethod
-    def get_kernel(cls, name, kernel_id):
+    def get_kernel(cls, kernelspec_name, kernel_id):
         """Get KernelConnection object."""
-        if (name, kernel_id) in cls.kernels:
-            return cls.kernels[(name, kernel_id)]
+        if (kernelspec_name, kernel_id) in cls.kernels:
+            return cls.kernels[(kernelspec_name, kernel_id)]
         else:
             if cls._token:
                 kernel = KernelConnection(
-                    name,
+                    kernelspec_name,
                     kernel_id,
                     cls,
                     auth_type="token",
@@ -162,18 +162,18 @@ class KernelManager(object):
                     logger=HERMES_LOGGER)
             else:
                 kernel = KernelConnection(
-                    name,
+                    kernelspec_name,
                     kernel_id,
                     cls,
                     logger=HERMES_LOGGER)
-                cls.kernels[(name, kernel_id)] = kernel
+                cls.kernels[(kernelspec_name, kernel_id)] = kernel
             return kernel
 
     @classmethod
-    def start_kernel(cls, name):
+    def start_kernel(cls, kernelspec_name):
         """Start kernel and return a `Kernel` instance."""
         url = '{}/api/kernels'.format(cls.base_url())
-        data = dict(name=name)
+        data = dict(name=kernelspec_name)
         response = cls.post_request(
             url,
             data=json.dumps(data))
@@ -388,7 +388,10 @@ def _list_kernels(window, view, *, logger=HERMES_LOGGER):
         logger.info(log_info_msg)
     elif index == 1:
         # Rename
-        raise NotImplementedError
+        conn = KernelManager.get_kernel(selected_kernel["name"], selected_kernel["id"])
+        curr_name = conn.connection_name if conn.connection_name is not None else ""
+        new_name = yield partial(window.show_input_panel, "New name", curr_name, on_change=None, on_cancel=None)
+        conn.connection_name = new_name
     elif index == 2:
         # Interrupt
         KernelManager.interrupt_kernel(
@@ -413,7 +416,7 @@ def _list_kernels(window, view, *, logger=HERMES_LOGGER):
             kernel_id=selected_kernel["id"])
         logger.info(log_info_msg)
 
-    _set_status_updater(view)
+    sublime.set_timeout_async(lambda: StatusBar(view), 0)
 
 
 class HermesListKernels(TextCommand):
