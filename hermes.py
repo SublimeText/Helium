@@ -359,13 +359,14 @@ class HermesStartKernel(TextCommand):
 
 @chain_callbacks
 def _list_kernels(window, view, *, logger=HERMES_LOGGER):
-    selected_kernel = yield partial(_show_kernel_selection_menu, window, view)
+    selected_kernel = yield partial(_show_kernel_selection_menu, window, view, add_new=True)
     subcommands = [
         "Connect",
         "Rename",
         "Interrupt",
         "Restart",
-        "Shutdown"
+        "Shutdown",
+        "Back to the kernel list"
     ]
     index = yield partial(window.show_quick_panel, subcommands)
     if index == 0:
@@ -483,7 +484,7 @@ class HermesConnectKernel(TextCommand):
 
 
 @chain_callbacks
-def _show_kernel_selection_menu(window, view, cb):
+def _show_kernel_selection_menu(window, view, cb, *, add_new=False):
     # Get the kurnel ID related to `view` if exists.
     try:
         current_kernel_id = ViewManager.get_kernel_for_view(view.buffer_id()).kernel_id
@@ -506,11 +507,15 @@ def _show_kernel_selection_menu(window, view, cb):
         else "[{lang}] {kernel_id}".format(lang=kernel["name"], kernel_id=kernel["id"])
         for kernel
         in kernel_list]
+    if add_new:
+        menu_items += ["New kernel"]
     index = yield partial(
         window.show_quick_panel,
         menu_items)
     if index == -1:
         selected_kernel = None
+    elif index == len(kernel_list):
+        yield partial(_start_kernel, window, view)
     else:
         selected_kernel = kernel_list[index]
     cb(selected_kernel)
