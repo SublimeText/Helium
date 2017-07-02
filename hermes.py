@@ -72,6 +72,9 @@ class ViewManager(object):
 class KernelManager(object):
     """Manage Jupyter kernels."""
 
+    # type: Dict[Tuple[str, str], KernelConnection]
+    # The key is a tuple consisted of the name of kernelspec and kernel ID,
+    # the value is a KernelConnection instance correspond to it.
     kernels = dict()
 
     def __new__(cls, *args, **kwargs):
@@ -181,6 +184,7 @@ class KernelManager(object):
 
     @classmethod
     def shutdown_kernel(cls, kernel_id):
+        """Shutdown kernel."""
         url = '{base_url}/api/kernels/{kernel_id}'.format(
             base_url=cls.base_url(),
             kernel_id=kernel_id)
@@ -188,6 +192,7 @@ class KernelManager(object):
 
     @classmethod
     def restart_kernel(cls, kernel_id):
+        """Restart kernel."""
         url = '{base_url}/api/kernels/{kernel_id}/restart'.format(
             base_url=cls.base_url(),
             kernel_id=kernel_id)
@@ -195,13 +200,15 @@ class KernelManager(object):
 
     @classmethod
     def interrupt_kernel(cls, kernel_id):
+        """Interrupt kernel."""
         url = '{base_url}/api/kernels/{kernel_id}/interrupt'.format(
             base_url=cls.base_url(),
             kernel_id=kernel_id)
         cls.post_request(url, dict())
 
     @classmethod
-    def post_request(cls, url, data):
+    def post_request(cls, url, data) -> dict:
+        """Send a POST HTTP request to the `url` with `data` as a body and get response."""
         if cls._token:
             header_auth_body = "token {token}".format(
                 token=cls._token)
@@ -215,7 +222,8 @@ class KernelManager(object):
         return response.json()
 
     @classmethod
-    def get_request(cls, url):
+    def get_request(cls, url) -> dict:
+        """Send a GET HTTP request to the `url` and get response."""
         if cls._token:
             header_auth_body = "token {token}".format(
                 token=cls._token)
@@ -228,7 +236,8 @@ class KernelManager(object):
         return response.json()
 
     @classmethod
-    def delete_request(cls, url):
+    def delete_request(cls, url) -> dict:
+        """Send a DELETE HTTP request to the `url`."""
         if cls._token:
             header_auth_body = "token {token}".format(
                 token=cls._token)
