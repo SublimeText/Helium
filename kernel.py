@@ -290,38 +290,7 @@ class KernelConnection(object):
                 lang=self.lang,
                 kernel_id=self.kernel_id)
 
-
     def _create_connection(self, connect_kwargs=dict()):
-        if self._auth_type == "no_auth":
-            sock = websocket.create_connection(
-                self._ws_url,
-                **connect_kwargs)
-        elif self._auth_type == "password":
-            sock = websocket.create_connection(
-                self._ws_url,
-                http_proxy_auth=self._auth_info,
-                **connect_kwargs)
-        elif self._auth_type == "token":
-            header_auth_body = "token {token}".format(
-                token=self._token)
-            header = dict(Authorization=header_auth_body)
-            sock = websocket.create_connection(
-                self._ws_url,
-                header=header)
-        return sock
-
-    def _communicate(self, message, timeout=None) -> JupyterReply:
-        """Send `message` to the kernel and return `reply` for it."""
-        # Use `create_connection`'s default value unless `timeout` is set.
-        if timeout is not None:
-            connect_kwargs = dict(timeout=timeout)
-        else:
-            connect_kwargs = dict()
-
-        sock = self._create_connection(connect_kwargs)
-        sock.send(json.dumps(message).encode())
-        replies = []
-        replied = False
         while True:
             # The code here requires refactoring.
             # The code to interpret reply messages is devided into here and `JupyterReply` class.
