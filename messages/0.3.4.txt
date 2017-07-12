@@ -1,0 +1,4 @@
+Update in 0.3.4 (draft)
+---------------
+
+  - Add request parameter on creating WebSocket connection to avoid "No session ID specified" warning dumped to the server log.
