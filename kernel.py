@@ -228,7 +228,7 @@ class KernelConnection(object):
         self._ws_url = '{base_ws_url}/api/kernels/{kernel_id}/channels?session_id={session_id}'.format(
             base_ws_url=manager.base_ws_url(),
             kernel_id=quote(kernel_id),
-            session_id=self._session)
+            session_id=quote(self._session))
         self._async_communicator = KernelConnection.AsyncCommunicator(self)
         self._async_communicator.start()
         self._logger = logger
