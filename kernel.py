@@ -224,16 +224,17 @@ class KernelConnection(object):
         self._lang = lang
         self._kernel_id = kernel_id
         self.manager = manager
-        self._ws_url = '{base_ws_url}/api/kernels/{kernel_id}/channels'.format(
+        self._session = uuid4().hex
+        self._ws_url = '{base_ws_url}/api/kernels/{kernel_id}/channels?session_id={session_id}'.format(
             base_ws_url=manager.base_ws_url(),
-            kernel_id=quote(kernel_id))
+            kernel_id=quote(kernel_id),
+            session_id=quote(self._session))
         self._async_communicator = KernelConnection.AsyncCommunicator(self)
         self._async_communicator.start()
         self._logger = logger
         self._auth_type = auth_type
         self._auth_info = auth_info
         self._token = token
-        self._session = uuid4().hex
         if username is None:
             self._username = (
                 sublime
