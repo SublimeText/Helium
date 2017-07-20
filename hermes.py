@@ -357,19 +357,32 @@ class HermesStartKernel(TextCommand):
         _start_kernel(sublime.active_window(), self.view)
 
 
+class ListKernelsSubcommands(object):
+
+    connect = "Connect"
+    rename = "Rename"
+    interrupt = "Interrupt"
+    restart = "Restart"
+    shutdown = "Shutdown"
+    back = "Back to the kernel list"
+
+
 @chain_callbacks
 def _list_kernels(window, view, *, logger=HERMES_LOGGER):
+    sc = ListKernelsSubcommands
     selected_kernel = yield partial(_show_kernel_selection_menu, window, view, add_new=True)
-    subcommands = [
-        "Connect",
-        "Rename",
-        "Interrupt",
-        "Restart",
-        "Shutdown",
-        "Back to the kernel list"
-    ]
+    subcommands = [sc.connect, sc.rename, sc.interrupt, sc.restart, sc.shutdown, sc.back]
+    try:
+        if selected_kernel["id"] == ViewManager.get_kernel_for_view(view.buffer_id()).kernel_id:
+            subcommands = [sc.rename, sc.interrupt, sc.restart, sc.shutdown, sc.back]
+    except KeyError:
+        # No kernel is connected
+        # `subcommands` includes "Connect"
+        pass
     index = yield partial(window.show_quick_panel, subcommands)
-    if index == 0:
+    if index == -1:
+        return
+    elif subcommands[index] is sc.connect:
         # Connect
         ViewManager.connect_kernel(
             view.buffer_id(),
@@ -386,13 +399,13 @@ def _list_kernels(window, view, *, logger=HERMES_LOGGER):
             buffer_id=view.buffer_id(),
             kernel_id=selected_kernel["id"])
         logger.info(log_info_msg)
-    elif index == 1:
+    elif subcommands[index] is sc.rename:
         # Rename
         conn = KernelManager.get_kernel(selected_kernel["name"], selected_kernel["id"])
         curr_name = conn.connection_name if conn.connection_name is not None else ""
         new_name = yield partial(window.show_input_panel, "New name", curr_name, on_change=None, on_cancel=None)
         conn.connection_name = new_name
-    elif index == 2:
+    elif subcommands[index] is sc.interrupt:
         # Interrupt
         KernelManager.interrupt_kernel(
             selected_kernel["id"])
@@ -400,7 +413,7 @@ def _list_kernels(window, view, *, logger=HERMES_LOGGER):
             "Interrupted kernel {kernel_id}.").format(
             kernel_id=selected_kernel["id"])
         logger.info(log_info_msg)
-    elif index == 3:
+    elif subcommands[index] is sc.restart:
         # Restart
         KernelManager.restart_kernel(
             selected_kernel["id"])
@@ -408,13 +421,17 @@ def _list_kernels(window, view, *, logger=HERMES_LOGGER):
             "Restarted kernel {kernel_id}.").format(
             kernel_id=selected_kernel["id"])
         logger.info(log_info_msg)
-    elif index == 4:
+    elif subcommands[index] is sc.shutdown:
+        # Shutdown
         KernelManager.shutdown_kernel(
             selected_kernel["id"])
         log_info_msg = (
             "Shutdown kernel {kernel_id}.").format(
             kernel_id=selected_kernel["id"])
         logger.info(log_info_msg)
+    elif subcommands[index] is sc.back:
+        # Back to the kernel list
+        yield _list_kernels(window, view)
 
     sublime.set_timeout_async(lambda: StatusBar(view), 0)
 
