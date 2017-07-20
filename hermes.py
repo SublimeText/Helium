@@ -544,7 +544,7 @@ def _show_kernel_selection_menu(window, view, cb, *, add_new=False):
         yield lambda cb: _set_url(window, continue_cb=cb)
         kernel_list = KernelManager.list_kernels()
     menu_items = [
-        repr + " (connected to current view)" if kernel["id"] == current_kernel_id else repr
+        "* " + repr if kernel["id"] == current_kernel_id else repr
         for repr, kernel
         in zip(KernelManager.list_kernel_reprs(), kernel_list)
     ]
