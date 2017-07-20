@@ -399,7 +399,7 @@ def _connect_kernel(
             buffer_id=view.buffer_id(),
             kernel_id=selected_kernel["id"])
         logger.info(log_info_msg)
-    _set_status_updater(view)
+    sublime.set_timeout_async(lambda: StatusBar(view), 0)
     continue_cb()
 
 
@@ -610,29 +610,59 @@ class HermesExecuteBlock(TextCommand):
         _execute_block(self.view, logger=logger)
 
 
-def _set_status_updater(view):
-    buffer_id = view.buffer_id()
-    if buffer_id != sublime.active_window().active_view().buffer_id():
-        return
-    try:
-        kernel = ViewManager.get_kernel_for_view(buffer_id)
+class StatusBar(object):
+    """Status Bar with animation."""
+    # This class is based on the one by @randy3k.
+
+    def __init__(self, view, width=10, interval=500):
+        self.view = view
+        self.width = width
+        self.buffer_id = view.buffer_id()
+        self.interval = interval
+        self.pos = 0
+        try:
+            self.kernel = ViewManager.get_kernel_for_view(self.buffer_id)
+            self.start()
+        except KeyError:
+            # When view is not connected.
+            self.stop()
+
+    def start(self):
+        self.update()
+
+    def stop(self):
+        self.view.set_status("hermes_connected_kernel", "")
+
+    def update(self, pos=0):
+        # `pos` can't be a property of `StatusBar` because it's not updated
+        # when `update()` is called by `sublime.set_timeout[_async]()`.
+        if self.buffer_id != sublime.active_window().active_view().buffer_id():
+            # Stop when view is unfocused.
+            self.stop()
+            return
+        execution_state = self.kernel.execution_state
+        if execution_state == "busy":
+            pos = pos % (2 * self.width)
+            before = min(pos, (2 * self.width) - pos)
+            after = self.width - before
+            progress_bar = " [{}={}]".format(" " * before, " " * after)
+        else:
+            # Make progress bar always start with pos=0.
+            pos = -1
+            progress_bar = ""
         status = "[{lang}] {kernel_id} ({execution_state})".format(
-            lang=kernel.lang,
-            kernel_id=kernel.kernel_id,
-            execution_state=kernel.execution_state)
-        view.set_status("hermes_connected_kernel", status)
-        sublime.set_timeout_async(lambda: _set_status_updater(view), 500)
-    except KeyError:
-        # When view is not connected.
-        view.set_status("hermes_connected_kernel", "")
-        return
+            lang=self.kernel.lang,
+            kernel_id=self.kernel.kernel_id,
+            execution_state=execution_state) + progress_bar
+        self.view.set_status("hermes_connected_kernel", status)
+        sublime.set_timeout_async(lambda: self.update(pos + 1), self.interval)
 
 
 class HermesStatusUpdater(ViewEventListener):
     """Listen to the heartbeat of kernel and update status of view."""
 
     def on_activated_async(self):
-        _set_status_updater(self.view)
+        sublime.set_timeout_async(lambda: StatusBar(self.view), 0)
 
 
 class HermesGetObjectInspection(TextCommand):
