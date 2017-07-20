@@ -179,7 +179,7 @@ class KernelManager(object):
                     kernel_id,
                     cls,
                     logger=HERMES_LOGGER)
-                cls.kernels[(kernelspec_name, kernel_id)] = kernel
+            cls.kernels[(kernelspec_name, kernel_id)] = kernel
             return kernel
 
     @classmethod
@@ -190,11 +190,14 @@ class KernelManager(object):
         response = cls.post_request(
             url,
             data=json.dumps(data))
-        return KernelConnection(
+        kernel = KernelConnection(
             lang=response["name"],
             kernel_id=response["id"],
             manager=cls,
+            logger=HERMES_LOGGER,
             connection_name=connection_name)
+        cls.kernels[(response["name"], response["id"])] = kernel
+        return kernel
 
     @classmethod
     def shutdown_kernel(cls, kernel_id):
@@ -343,7 +346,10 @@ def _start_kernel(
     if index == -1:
         return
     selected_kernelspec = menu_items[index]
-    kernel = KernelManager.start_kernel(selected_kernelspec)
+    connection_name = yield partial(window.show_input_panel, "connection name", "", on_change=None, on_cancel=None)
+    if connection_name == "":
+        connection_name = None
+    kernel = KernelManager.start_kernel(selected_kernelspec, connection_name=connection_name)
     ViewManager.connect_kernel(
         view.buffer_id(),
         kernel.lang,
@@ -523,7 +529,8 @@ def _show_kernel_selection_menu(window, view, cb, *, add_new=False):
     try:
         current_kernel_id = ViewManager.get_kernel_for_view(view.buffer_id()).kernel_id
     except KeyError:
-        result = re.match(r"\*Hermes Output\* \[.*?\] ([\w-]*)", view.name())
+        # TODO fix to use property of views.
+        result = re.match(r"\*Hermes Output\* .*?\(\[.*?\] ([\w-]*)\)", view.name())
         if result:
             current_kernel_id = result.group(1)
         else:
@@ -532,13 +539,15 @@ def _show_kernel_selection_menu(window, view, cb, *, add_new=False):
     # It's better to pass the list of (connection_name, kernel_id) tuples to improve the appearane of the menu.
     try:
         kernel_list = KernelManager.list_kernels()
-        menu_items = KernelManager.list_kernel_reprs()
     except (requests.RequestException, AttributeError):
         sublime.message_dialog("Set URL first, please.")
         yield lambda cb: _set_url(window, continue_cb=cb)
         kernel_list = KernelManager.list_kernels()
-        menu_items = KernelManager.list_kernel_reprs()
-
+    menu_items = [
+        repr + " (connected to current view)" if kernel["id"] == current_kernel_id else repr
+        for repr, kernel
+        in zip(KernelManager.list_kernel_reprs(), kernel_list)
+    ]
     if add_new:
         menu_items += ["New kernel"]
     index = yield partial(
