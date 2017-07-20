@@ -147,6 +147,19 @@ class KernelManager(object):
         return cls.get_request(url)
 
     @classmethod
+    def list_kernel_reprs(cls):
+        """Get the list of representations of kernels."""
+        def get_repr(kernel):
+            key = (kernel["name"], kernel["id"])
+            try:
+                return cls.kernels[key].repr
+            except KeyError:
+                return "[{lang}] {kernel_id}".format(
+                    lang=kernel["name"],
+                    kernel_id=kernel["id"])
+        return list(map(get_repr, cls.list_kernels()))
+
+    @classmethod
     def get_kernel(cls, kernelspec_name, kernel_id):
         """Get KernelConnection object."""
         if (kernelspec_name, kernel_id) in cls.kernels:
@@ -170,7 +183,7 @@ class KernelManager(object):
             return kernel
 
     @classmethod
-    def start_kernel(cls, kernelspec_name):
+    def start_kernel(cls, kernelspec_name, connection_name=None):
         """Start kernel and return a `Kernel` instance."""
         url = '{}/api/kernels'.format(cls.base_url())
         data = dict(name=kernelspec_name)
@@ -180,7 +193,8 @@ class KernelManager(object):
         return KernelConnection(
             lang=response["name"],
             kernel_id=response["id"],
-            manager=cls)
+            manager=cls,
+            connection_name=connection_name)
 
     @classmethod
     def shutdown_kernel(cls, kernel_id):
@@ -514,19 +528,17 @@ def _show_kernel_selection_menu(window, view, cb, *, add_new=False):
             current_kernel_id = result.group(1)
         else:
             current_kernel_id = ""
+
+    # It's better to pass the list of (connection_name, kernel_id) tuples to improve the appearane of the menu.
     try:
         kernel_list = KernelManager.list_kernels()
+        menu_items = KernelManager.list_kernel_reprs()
     except (requests.RequestException, AttributeError):
         sublime.message_dialog("Set URL first, please.")
         yield lambda cb: _set_url(window, continue_cb=cb)
         kernel_list = KernelManager.list_kernels()
+        menu_items = KernelManager.list_kernel_reprs()
 
-    menu_items = [
-        "[{lang}] {kernel_id} (connected to this view)".format(lang=kernel["name"], kernel_id=kernel["id"])
-        if kernel["id"] == current_kernel_id
-        else "[{lang}] {kernel_id}".format(lang=kernel["name"], kernel_id=kernel["id"])
-        for kernel
-        in kernel_list]
     if add_new:
         menu_items += ["New kernel"]
     index = yield partial(
