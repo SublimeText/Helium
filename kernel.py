@@ -15,7 +15,7 @@ from uuid import uuid4
 from datetime import datetime
 import re
 
-from websocket import create_connection
+import websocket
 import sublime
 
 from .utils import (
@@ -235,6 +235,7 @@ class KernelConnection(object):
         self._auth_type = auth_type
         self._auth_info = auth_info
         self._token = token
+        self._execution_state = 'unknown'
         if username is None:
             self._username = (
                 sublime
@@ -258,13 +259,13 @@ class KernelConnection(object):
             lang=self.lang,
             kernel_id=self.kernel_id)
 
-    def _create_connection(self, connect_kwargs):
+    def _create_connection(self, connect_kwargs=dict()):
         if self._auth_type == "no_auth":
-            sock = create_connection(
+            sock = websocket.create_connection(
                 self._ws_url,
                 **connect_kwargs)
         elif self._auth_type == "password":
-            sock = create_connection(
+            sock = websocket.create_connection(
                 self._ws_url,
                 http_proxy_auth=self._auth_info,
                 **connect_kwargs)
@@ -272,7 +273,7 @@ class KernelConnection(object):
             header_auth_body = "token {token}".format(
                 token=self._token)
             header = dict(Authorization=header_auth_body)
-            sock = create_connection(
+            sock = websocket.create_connection(
                 self._ws_url,
                 header=header)
         return sock
@@ -516,12 +517,23 @@ class KernelConnection(object):
         info_message = "Kernel executed code ```{code}```.".format(code=code)
         self._logger.info(info_message)
 
+    def is_alive(self):
+        """Return True if kernel is alive."""
+        try:
+            sock = self._create_connection()
+            if sock is not None:
+                sock.close()
+            return True
+        except websocket.WebSocketException:
+            # Now we consider the kernel dead if we can't connect via WebSocket.
+            # There should be several case that kernel is not dead but we can't connect,
+            # i.e. temporary bad condition of network. Should we distinguish these cases?
+            self._execution_state = 'dead'
+            return False
+
     @property
     def execution_state(self):
-        try:
-            return self._execution_state
-        except AttributeError:
-            return "unknown"
+        return self._execution_state
 
     def get_complete(self, code, cursor_pos, timeout=None):
         """Generate complete request."""
