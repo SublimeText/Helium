@@ -452,7 +452,6 @@ def _list_kernels(window, view, *, logger=HERMES_LOGGER):
     elif subcommands[index] is sc.back:
         # Back to the kernel list
         yield _list_kernels(window, view)
-
     sublime.set_timeout_async(lambda: StatusBar(view), 0)
 
 
@@ -780,10 +779,16 @@ class StatusBar(object):
             # Make progress bar always start with pos=0.
             pos = -1
             progress_bar = ""
+<<<<<<< HEAD
         status = "[{lang}] {kernel_id} ({execution_state})".format(
             lang=self.kernel.lang,
             kernel_id=self.kernel.kernel_id,
             execution_state=execution_state) + progress_bar
+=======
+        status = "{repr} (state: {execution_state})".format(
+            repr=self.kernel.repr,
+            execution_state=self.kernel.execution_state) + progress_bar
+>>>>>>> Fixed bugs mixed on merging.
         self.view.set_status("hermes_connected_kernel", status)
         sublime.set_timeout_async(lambda: self.update(pos + 1), self.interval)
 
