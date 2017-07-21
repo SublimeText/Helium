@@ -1,4 +1,9 @@
-Update in 0.3.4 (draft)
+Update in 0.3.4
 ---------------
 
-  - Add request parameter on creating WebSocket connection to avoid "No session ID specified" warning dumped to the server log.
+  - Add request parameter on creating WebSocket connection to avoid "No session ID specified" warning dumped to the server log (#9).
+  - Show progress bar while the kernel is busy(#12).
+  - Disable "Hermes: Execute Block" command if the kernel is dead (#13).
+
+Now we plan to rename and refactor the commands as argued in #4 (working branch is #14).
+If you have any openion about it, feel free to express it in the issue.

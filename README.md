@@ -75,9 +75,13 @@ Usage
 TODOs
 -----------------
 
+Now we plan to rename and refactor the commands as argued in #4 (working branch is #14).
+If you have any openion about it, feel free to express it in the issue.
+
+Other issues:
+
   - [ ] Moving cursor on execution.
   - [ ] Rearrange log messages. Make option to set logging level.
-  - [ ] Enable object inspection to be shown in popup.
   - [ ] Implement output as inline Phantom like LightTable or Hydrogen.
   - [ ] Password authentication.
 
