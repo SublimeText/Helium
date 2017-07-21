@@ -605,6 +605,16 @@ def _execute_block(view, *, logger=HERMES_LOGGER):
 class HermesExecuteBlock(TextCommand):
     """Execute code."""
 
+    def is_enabled(self, *, logger=HERMES_LOGGER):
+        return self.is_visible()
+
+    def is_visible(self, *, logger=HERMES_LOGGER):
+        try:
+            kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
+        except KeyError:
+            return False
+        return kernel.is_alive()
+
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
         _execute_block(self.view, logger=logger)
@@ -641,7 +651,10 @@ class StatusBar(object):
             self.stop()
             return
         execution_state = self.kernel.execution_state
-        if execution_state == "busy":
+        if execution_state == "dead":
+            # Stop when kernel is dead.
+            return
+        elif execution_state == "busy":
             pos = pos % (2 * self.width)
             before = min(pos, (2 * self.width) - pos)
             after = self.width - before
