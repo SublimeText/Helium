@@ -428,6 +428,7 @@ class KernelConnection(object):
             'append',
             {'characters': text})
         view.set_read_only(True)
+        view.show(view.size())
 
     def _write_phantom(self, content: str):
         file_size = self.get_view().size()

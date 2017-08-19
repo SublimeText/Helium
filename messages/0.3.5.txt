@@ -1,0 +1,7 @@
+Update in 0.3.4
+---------------
+
+  - Scroll to the end of the result buffer on code block execution(#15).
+
+Now we plan to rename and refactor the commands as argued in #4 (working branch is #14).
+If you have any openion about it, feel free to express it in the issue.
