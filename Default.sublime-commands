@@ -30,5 +30,13 @@
   {
     "caption": "Hermes: Get Object Inspection",
     "command": "hermes_get_object_inspection"
-  }
+  },
+  {
+    "caption": "Hermes: Settings",
+    "command": "edit_settings", "args":
+    {
+      "base_file": "${packages}/Hermes/Hermes.sublime-settings",
+      "default": "{\n  \"connections\": [\n    $0\n  ]\n}"
+    }
+  },
 ]
