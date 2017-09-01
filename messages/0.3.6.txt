@@ -1,0 +1,4 @@
+Update in 0.3.6
+---------------
+
+  - Fixed code block detection when there are code block(s) selected.
