@@ -550,7 +550,7 @@ def get_block(view: sublime.View, s: sublime.Region) -> (str, sublime.Region):
     If `s` is a selected region, the code block is it.
     """
     if not s.empty():
-        return view.substr(s)
+        return (view.substr(s), s)
     view_end_row = view.rowcol(view.size())[0]
     current_row = view.rowcol(s.begin())[0]
     current_indent = get_indent(view, current_row)
