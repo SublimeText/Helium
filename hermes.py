@@ -404,7 +404,7 @@ def _connect_kernel(
 
 
 class HermesConnectKernel(TextCommand):
-    """Set url of jupyter process."""
+    """Connect to jupyter kernel."""
 
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
@@ -465,7 +465,7 @@ def _interrupt_kernel(
 
 
 class HermesInterruptKernel(TextCommand):
-    """Set url of jupyter process."""
+    """Interrupt jupyter kernel."""
 
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
@@ -492,7 +492,7 @@ def _restart_kernel(
 
 
 class HermesRestartKernel(TextCommand):
-    """Set url of jupyter process."""
+    """Restart jupyter kernel."""
 
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
@@ -519,7 +519,7 @@ def _shutdown_kernel(
 
 
 class HermesShutdownKernel(TextCommand):
-    """Set url of jupyter process."""
+    """Shutdown jupyter kernel."""
 
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
