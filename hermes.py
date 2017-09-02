@@ -219,6 +219,8 @@ class KernelManager(object):
             url,
             data=data,
             headers=header)
+        if response.status_code != requests.codes.ok:
+            response.raise_for_status()
         return response.json()
 
     @classmethod
@@ -233,6 +235,8 @@ class KernelManager(object):
         response = requests.get(
             url,
             headers=header)
+        if response.status_code != requests.codes.ok:
+            response.raise_for_status()
         return response.json()
 
     @classmethod
@@ -247,6 +251,8 @@ class KernelManager(object):
         response = requests.delete(
             url,
             headers=header)
+        if response.status_code != requests.codes.ok:
+            response.raise_for_status()
         return response.json()
 
 
