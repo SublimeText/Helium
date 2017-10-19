@@ -722,14 +722,14 @@ class HermesExecuteBlock(TextCommand):
     """Execute code."""
 
     def is_enabled(self, *, logger=HERMES_LOGGER):
-        return self.is_visible()
-
-    def is_visible(self, *, logger=HERMES_LOGGER):
         try:
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except KeyError:
             return False
         return kernel.is_alive()
+
+    def is_visible(self, *, logger=HERMES_LOGGER):
+        return self.is_enabled()
 
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
