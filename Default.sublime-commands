@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 [
   {
     "caption": "Hermes: Connect Kernel",
@@ -44,3 +43,4 @@
       "default": "{\n  \"connections\": [\n    $0\n  ]\n}"
     }
   },
+]
