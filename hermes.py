@@ -314,7 +314,7 @@ def _set_url(window, *, continue_cb=lambda: None):
     continue_cb()
 
 
-class HermesSetUrl(WindowCommand):
+class HermesConnectServer(WindowCommand):
     """Set url of jupyter process."""
 
     def run(self):
