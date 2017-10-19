@@ -1,7 +1,7 @@
 """Hermes package for Sublime Text 3.
 
 The package provides code execution and completion in interaction with Jupyter.
-Copyright (c) 2016, NEGORO Tetsuya (https://github.com/ngr-t)
+Copyright (c) 2016-2017, NEGORO Tetsuya (https://github.com/ngr-t)
 """
 
 import json
@@ -274,7 +274,7 @@ class KernelManager(object):
 
 
 @chain_callbacks
-def _set_url(window, *, continue_cb=lambda: None):
+def _connect_server(window, *, continue_cb=lambda: None):
     settings = sublime.load_settings("Hermes.sublime-settings")
     connections = settings.get("connections", [])
     connection_menu_items = [
@@ -319,7 +319,7 @@ class HermesConnectServer(WindowCommand):
 
     def run(self):
         """Command."""
-        _set_url(self.window)
+        _connect_server(self.window)
 
 
 @chain_callbacks
@@ -335,7 +335,7 @@ def _start_kernel(
     except requests.RequestException:
         sublime.message_dialog("Set URL first, please.")
         window = sublime.active_window()
-        yield partial(_set_url, window)
+        yield partial(_connect_server, window)
 
     menu_items = list(kernelspecs["kernelspecs"].keys())
 
@@ -474,7 +474,7 @@ def _connect_kernel(
         kernel_list = KernelManager.list_kernels()
     except (requests.RequestException, AttributeError):
         sublime.message_dialog("Set URL first, please.")
-        yield lambda cb: _set_url(window, continue_cb=cb)
+        yield lambda cb: _connect_server(window, continue_cb=cb)
         kernel_list = KernelManager.list_kernels()
 
     menu_items = [
@@ -539,8 +539,8 @@ def _show_kernel_selection_menu(window, view, cb, *, add_new=False):
     try:
         kernel_list = KernelManager.list_kernels()
     except (requests.RequestException, AttributeError):
-        sublime.message_dialog("Set URL first, please.")
-        yield lambda cb: _set_url(window, continue_cb=cb)
+        sublime.message_dialog("Connect to Jupyter first, please.")
+        yield lambda cb: _connect_server(window, continue_cb=cb)
         kernel_list = KernelManager.list_kernels()
     menu_items = [
         "* " + repr if kernel["id"] == current_kernel_id else repr
@@ -583,6 +583,16 @@ def _interrupt_kernel(
 class HermesInterruptKernel(TextCommand):
     """Interrupt jupyter kernel."""
 
+    def is_enabled(self, *, logger=HERMES_LOGGER):
+        try:
+            kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
+        except KeyError:
+            return False
+        return kernel.is_alive()
+
+    def is_visible(self, *, logger=HERMES_LOGGER):
+        return self.is_enabled()
+
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
         _interrupt_kernel(sublime.active_window(), self.view, logger=logger)
@@ -610,6 +620,16 @@ def _restart_kernel(
 class HermesRestartKernel(TextCommand):
     """Restart jupyter kernel."""
 
+    def is_enabled(self, *, logger=HERMES_LOGGER):
+        try:
+            kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
+        except KeyError:
+            return False
+        return kernel.is_alive()
+
+    def is_visible(self, *, logger=HERMES_LOGGER):
+        return self.is_enabled()
+
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
         _restart_kernel(sublime.active_window(), self.view, logger=logger)
@@ -636,6 +656,16 @@ def _shutdown_kernel(
 
 class HermesShutdownKernel(TextCommand):
     """Shutdown jupyter kernel."""
+
+    def is_enabled(self, *, logger=HERMES_LOGGER):
+        try:
+            kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
+        except KeyError:
+            return False
+        return kernel.is_alive()
+
+    def is_visible(self, *, logger=HERMES_LOGGER):
+        return self.is_enabled()
 
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
@@ -795,6 +825,16 @@ class HermesStatusUpdater(ViewEventListener):
 
 class HermesGetObjectInspection(TextCommand):
     """Get object inspection."""
+
+    def is_enabled(self, *, logger=HERMES_LOGGER):
+        try:
+            kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
+        except KeyError:
+            return False
+        return kernel.is_alive()
+
+    def is_visible(self, *, logger=HERMES_LOGGER):
+        return self.is_enabled()
 
     @chain_callbacks
     def run(self, edit, *, logger=HERMES_LOGGER):
