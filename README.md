@@ -11,8 +11,6 @@ Any feedback is highly welcome. I hope this package will help your life with ST3
 Features
 ---------------
 
-Currently it supports the actions below:
-
   - Connect to Jupyter gateway and start / interrupt / shutdown / restart kernels.
   - Connect to running Jupyter processes through HTTP.
 
@@ -58,27 +56,26 @@ You can install it with Package Control plugin, run `Package Control: Install Pa
 Usage
 -----------------
 
-  0. (Outside of the editor) Start Jupyter notebook or create tunneling.
-  1. Set url by `Hermes: Set URL` command (whose command name is `hermes_set_url`).
+  0. (Outside of the editor) Start Jupyter notebook server. Create a SSH tunnel to that if necessary.
+  1. Connect to the server by `Hermes: Connect Server` command (whose command name is `hermes_connect_server`). Input the address of the Jupyter server and the token of the running process. You can write them in the preference.
   2. Connect to kernel.
 
     - If no kernel is running, start a kernel by `Hermes: Start Kernel` (whose command name is `hermes_start_kernel`)
     - If kernel exists, correspond the view to the kernel by `Hermes: Connect Kernel` (whose command name is `hermes_connect_kernel`)
+    - You will be required to input 
 
-  3. Play with Jupyter kernels.
+  3. Play with Jupyter kernels. Commands below are shown only when the active view is connected to a Jupyter kernel.
 
     - Execute code by `Hermes: Execute Block` (whose command name is `hermes_execute_block`).
     - Get Object Inspection by `Hermes: Get Object Inspection` (whose command name is `hermes_get_object_inspection`).
     - You should be able to get autocomplete from the kernel from the time you connected. If you don't want autocomplete, set `"complete"` as `false` in setting file.
+    - You can restart, shutdown, and interrupt process via `Hermes: Restart Kernel`, `Hermes: Shutdown Kernel`, `Hermes: Interrupt Kernel` commands.
+
+  4. You can manipulate kernels by `Hermes: List Kernels` command.
 
 
 TODOs
 -----------------
-
-Now we plan to rename and refactor the commands as argued in #4 (working branch is #14).
-If you have any openion about it, feel free to express it in the issue.
-
-Other issues:
 
   - [ ] Moving cursor on execution.
   - [ ] Rearrange log messages. Make option to set logging level.
