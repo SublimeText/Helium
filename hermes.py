@@ -1,7 +1,7 @@
 """Hermes package for Sublime Text 3.
 
 The package provides code execution and completion in interaction with Jupyter.
-Copyright (c) 2016, NEGORO Tetsuya (https://github.com/ngr-t)
+Copyright (c) 2016-2017, NEGORO Tetsuya (https://github.com/ngr-t)
 """
 
 import json
@@ -147,14 +147,27 @@ class KernelManager(object):
         return cls.get_request(url)
 
     @classmethod
-    def get_kernel(cls, name, kernel_id):
+    def list_kernel_reprs(cls):
+        """Get the list of representations of kernels."""
+        def get_repr(kernel):
+            key = (kernel["name"], kernel["id"])
+            try:
+                return cls.kernels[key].repr
+            except KeyError:
+                return "[{lang}] {kernel_id}".format(
+                    lang=kernel["name"],
+                    kernel_id=kernel["id"])
+        return list(map(get_repr, cls.list_kernels()))
+
+    @classmethod
+    def get_kernel(cls, kernelspec_name, kernel_id):
         """Get KernelConnection object."""
-        if (name, kernel_id) in cls.kernels:
-            return cls.kernels[(name, kernel_id)]
+        if (kernelspec_name, kernel_id) in cls.kernels:
+            return cls.kernels[(kernelspec_name, kernel_id)]
         else:
             if cls._token:
                 kernel = KernelConnection(
-                    name,
+                    kernelspec_name,
                     kernel_id,
                     cls,
                     auth_type="token",
@@ -162,25 +175,29 @@ class KernelManager(object):
                     logger=HERMES_LOGGER)
             else:
                 kernel = KernelConnection(
-                    name,
+                    kernelspec_name,
                     kernel_id,
                     cls,
                     logger=HERMES_LOGGER)
-                cls.kernels[(name, kernel_id)] = kernel
+            cls.kernels[(kernelspec_name, kernel_id)] = kernel
             return kernel
 
     @classmethod
-    def start_kernel(cls, name):
+    def start_kernel(cls, kernelspec_name, connection_name=None):
         """Start kernel and return a `Kernel` instance."""
         url = '{}/api/kernels'.format(cls.base_url())
-        data = dict(name=name)
+        data = dict(name=kernelspec_name)
         response = cls.post_request(
             url,
             data=json.dumps(data))
-        return KernelConnection(
+        kernel = KernelConnection(
             lang=response["name"],
             kernel_id=response["id"],
-            manager=cls)
+            manager=cls,
+            logger=HERMES_LOGGER,
+            connection_name=connection_name)
+        cls.kernels[(response["name"], response["id"])] = kernel
+        return kernel
 
     @classmethod
     def shutdown_kernel(cls, kernel_id):
@@ -257,7 +274,7 @@ class KernelManager(object):
 
 
 @chain_callbacks
-def _set_url(window, *, continue_cb=lambda: None):
+def _connect_server(window, *, continue_cb=lambda: None):
     settings = sublime.load_settings("Hermes.sublime-settings")
     connections = settings.get("connections", [])
     connection_menu_items = [
@@ -297,12 +314,12 @@ def _set_url(window, *, continue_cb=lambda: None):
     continue_cb()
 
 
-class HermesSetUrl(WindowCommand):
+class HermesConnectServer(WindowCommand):
     """Set url of jupyter process."""
 
     def run(self):
         """Command."""
-        _set_url(self.window)
+        _connect_server(self.window)
 
 
 @chain_callbacks
@@ -318,7 +335,7 @@ def _start_kernel(
     except requests.RequestException:
         sublime.message_dialog("Set URL first, please.")
         window = sublime.active_window()
-        yield partial(_set_url, window)
+        yield partial(_connect_server, window)
 
     menu_items = list(kernelspecs["kernelspecs"].keys())
 
@@ -329,7 +346,10 @@ def _start_kernel(
     if index == -1:
         return
     selected_kernelspec = menu_items[index]
-    kernel = KernelManager.start_kernel(selected_kernelspec)
+    connection_name = yield partial(window.show_input_panel, "connection name", "", on_change=None, on_cancel=None)
+    if connection_name == "":
+        connection_name = None
+    kernel = KernelManager.start_kernel(selected_kernelspec, connection_name=connection_name)
     ViewManager.connect_kernel(
         view.buffer_id(),
         kernel.lang,
@@ -357,6 +377,91 @@ class HermesStartKernel(TextCommand):
         _start_kernel(sublime.active_window(), self.view)
 
 
+class ListKernelsSubcommands(object):
+
+    connect = "Connect"
+    rename = "Rename"
+    interrupt = "Interrupt"
+    restart = "Restart"
+    shutdown = "Shutdown"
+    back = "Back to the kernel list"
+
+
+@chain_callbacks
+def _list_kernels(window, view, *, logger=HERMES_LOGGER):
+    sc = ListKernelsSubcommands
+    selected_kernel = yield partial(_show_kernel_selection_menu, window, view, add_new=True)
+    subcommands = [sc.connect, sc.rename, sc.interrupt, sc.restart, sc.shutdown, sc.back]
+    try:
+        if selected_kernel["id"] == ViewManager.get_kernel_for_view(view.buffer_id()).kernel_id:
+            subcommands = [sc.rename, sc.interrupt, sc.restart, sc.shutdown, sc.back]
+    except KeyError:
+        # No kernel is connected
+        # `subcommands` includes "Connect"
+        pass
+    index = yield partial(window.show_quick_panel, subcommands)
+    if index == -1:
+        return
+    elif subcommands[index] is sc.connect:
+        # Connect
+        ViewManager.connect_kernel(
+            view.buffer_id(),
+            selected_kernel["name"],
+            selected_kernel["id"])
+        if view.file_name():
+            view_name = view.file_name()
+        else:
+            view_name = view.name()
+        log_info_msg = (
+            "Connected view '{view_name}(id: {buffer_id})'"
+            "to kernel {kernel_id}.").format(
+            view_name=view_name,
+            buffer_id=view.buffer_id(),
+            kernel_id=selected_kernel["id"])
+        logger.info(log_info_msg)
+    elif subcommands[index] is sc.rename:
+        # Rename
+        conn = KernelManager.get_kernel(selected_kernel["name"], selected_kernel["id"])
+        curr_name = conn.connection_name if conn.connection_name is not None else ""
+        new_name = yield partial(window.show_input_panel, "New name", curr_name, on_change=None, on_cancel=None)
+        conn.connection_name = new_name
+    elif subcommands[index] is sc.interrupt:
+        # Interrupt
+        KernelManager.interrupt_kernel(
+            selected_kernel["id"])
+        log_info_msg = (
+            "Interrupted kernel {kernel_id}.").format(
+            kernel_id=selected_kernel["id"])
+        logger.info(log_info_msg)
+    elif subcommands[index] is sc.restart:
+        # Restart
+        KernelManager.restart_kernel(
+            selected_kernel["id"])
+        log_info_msg = (
+            "Restarted kernel {kernel_id}.").format(
+            kernel_id=selected_kernel["id"])
+        logger.info(log_info_msg)
+    elif subcommands[index] is sc.shutdown:
+        # Shutdown
+        KernelManager.shutdown_kernel(
+            selected_kernel["id"])
+        log_info_msg = (
+            "Shutdown kernel {kernel_id}.").format(
+            kernel_id=selected_kernel["id"])
+        logger.info(log_info_msg)
+    elif subcommands[index] is sc.back:
+        # Back to the kernel list
+        yield _list_kernels(window, view)
+    sublime.set_timeout_async(lambda: StatusBar(view), 0)
+
+
+class HermesListKernels(TextCommand):
+    """Command that shows the list of kernels and do some action for chosen kernels."""
+
+    def run(self, edit, *, logger=HERMES_LOGGER):
+        _list_kernels(sublime.active_window(), self.view)
+
+
 @chain_callbacks
 def _connect_kernel(
     window,
@@ -369,7 +474,7 @@ def _connect_kernel(
         kernel_list = KernelManager.list_kernels()
     except (requests.RequestException, AttributeError):
         sublime.message_dialog("Set URL first, please.")
-        yield lambda cb: _set_url(window, continue_cb=cb)
+        yield lambda cb: _connect_server(window, continue_cb=cb)
         kernel_list = KernelManager.list_kernels()
 
     menu_items = [
@@ -418,34 +523,39 @@ class HermesConnectKernel(TextCommand):
 
 
 @chain_callbacks
-def _show_kernel_selection_menu(window, view, cb):
-    # Get the kernel ID related to `view` if exists.
+def _show_kernel_selection_menu(window, view, cb, *, add_new=False):
+    # Get the kurnel ID related to `view` if exists.
     try:
         current_kernel_id = ViewManager.get_kernel_for_view(view.buffer_id()).kernel_id
     except KeyError:
-        result = re.match(r"\*Hermes Output\* \[.*?\] ([\w-]*)", view.name())
+        # TODO fix to use property of views.
+        result = re.match(r"\*Hermes Output\* .*?\(\[.*?\] ([\w-]*)\)", view.name())
         if result:
             current_kernel_id = result.group(1)
         else:
             current_kernel_id = ""
+
+    # It's better to pass the list of (connection_name, kernel_id) tuples to improve the appearane of the menu.
     try:
         kernel_list = KernelManager.list_kernels()
     except (requests.RequestException, AttributeError):
-        sublime.message_dialog("Set URL first, please.")
-        yield lambda cb: _set_url(window, continue_cb=cb)
+        sublime.message_dialog("Connect to Jupyter first, please.")
+        yield lambda cb: _connect_server(window, continue_cb=cb)
         kernel_list = KernelManager.list_kernels()
-
     menu_items = [
-        "[{lang}] {kernel_id} (connected to this view)".format(lang=kernel["name"], kernel_id=kernel["id"])
-        if kernel["id"] == current_kernel_id
-        else "[{lang}] {kernel_id}".format(lang=kernel["name"], kernel_id=kernel["id"])
-        for kernel
-        in kernel_list]
+        "* " + repr if kernel["id"] == current_kernel_id else repr
+        for repr, kernel
+        in zip(KernelManager.list_kernel_reprs(), kernel_list)
+    ]
+    if add_new:
+        menu_items += ["New kernel"]
     index = yield partial(
         window.show_quick_panel,
         menu_items)
     if index == -1:
         selected_kernel = None
+    elif index == len(kernel_list):
+        yield partial(_start_kernel, window, view)
     else:
         selected_kernel = kernel_list[index]
     cb(selected_kernel)
@@ -472,6 +582,16 @@ def _interrupt_kernel(
 
 class HermesInterruptKernel(TextCommand):
     """Interrupt jupyter kernel."""
+
+    def is_enabled(self, *, logger=HERMES_LOGGER):
+        try:
+            kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
+        except KeyError:
+            return False
+        return kernel.is_alive()
+
+    def is_visible(self, *, logger=HERMES_LOGGER):
+        return self.is_enabled()
 
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
@@ -500,6 +620,16 @@ def _restart_kernel(
 class HermesRestartKernel(TextCommand):
     """Restart jupyter kernel."""
 
+    def is_enabled(self, *, logger=HERMES_LOGGER):
+        try:
+            kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
+        except KeyError:
+            return False
+        return kernel.is_alive()
+
+    def is_visible(self, *, logger=HERMES_LOGGER):
+        return self.is_enabled()
+
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
         _restart_kernel(sublime.active_window(), self.view, logger=logger)
@@ -526,6 +656,16 @@ def _shutdown_kernel(
 
 class HermesShutdownKernel(TextCommand):
     """Shutdown jupyter kernel."""
+
+    def is_enabled(self, *, logger=HERMES_LOGGER):
+        try:
+            kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
+        except KeyError:
+            return False
+        return kernel.is_alive()
+
+    def is_visible(self, *, logger=HERMES_LOGGER):
+        return self.is_enabled()
 
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
@@ -612,14 +752,14 @@ class HermesExecuteBlock(TextCommand):
     """Execute code."""
 
     def is_enabled(self, *, logger=HERMES_LOGGER):
-        return self.is_visible()
-
-    def is_visible(self, *, logger=HERMES_LOGGER):
         try:
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except KeyError:
             return False
         return kernel.is_alive()
+
+    def is_visible(self, *, logger=HERMES_LOGGER):
+        return self.is_enabled()
 
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
@@ -669,10 +809,9 @@ class StatusBar(object):
             # Make progress bar always start with pos=0.
             pos = -1
             progress_bar = ""
-        status = "[{lang}] {kernel_id} ({execution_state})".format(
-            lang=self.kernel.lang,
-            kernel_id=self.kernel.kernel_id,
-            execution_state=execution_state) + progress_bar
+        status = "{repr} (state: {execution_state})".format(
+            repr=self.kernel.repr,
+            execution_state=self.kernel.execution_state) + progress_bar
         self.view.set_status("hermes_connected_kernel", status)
         sublime.set_timeout_async(lambda: self.update(pos + 1), self.interval)
 
@@ -686,6 +825,16 @@ class HermesStatusUpdater(ViewEventListener):
 
 class HermesGetObjectInspection(TextCommand):
     """Get object inspection."""
+
+    def is_enabled(self, *, logger=HERMES_LOGGER):
+        try:
+            kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
+        except KeyError:
+            return False
+        return kernel.is_alive()
+
+    def is_visible(self, *, logger=HERMES_LOGGER):
+        return self.is_enabled()
 
     @chain_callbacks
     def run(self, edit, *, logger=HERMES_LOGGER):

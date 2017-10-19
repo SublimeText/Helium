@@ -20,12 +20,16 @@
     "command": "hermes_interrupt_kernel"
   },
   {
-    "caption": "Hermes: Set URL",
-    "command": "hermes_set_url"
+    "caption": "Hermes: Connect Server",
+    "command": "hermes_connect_server"
   },
   {
     "caption": "Hermes: Execute Block",
     "command": "hermes_execute_block"
+  },
+  {
+    "caption": "Hermes: List Kernels",
+    "command": "hermes_list_kernels"
   },
   {
     "caption": "Hermes: Get Object Inspection",

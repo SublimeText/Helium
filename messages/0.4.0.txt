@@ -1,0 +1,7 @@
+Update in 0.4.0
+---------------
+
+  - `Hermes: Set URL` command is renamed to `Hermes: Connect Server`.
+  - `Hermes: List Kernels` command is added. You can do several actions on kernels running in Jupyter process with this command.
+  - You become to be able to name the connections to the kernels, when you want.
+  - Execute, object inspection, interrupt, shutdown, and restart commands are now only shown when the active view is connected to a kernel.
