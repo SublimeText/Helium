@@ -190,14 +190,7 @@ class KernelManager(object):
         response = cls.post_request(
             url,
             data=json.dumps(data))
-        kernel = KernelConnection(
-            lang=response["name"],
-            kernel_id=response["id"],
-            manager=cls,
-            logger=HERMES_LOGGER,
-            connection_name=connection_name)
-        cls.kernels[(response["name"], response["id"])] = kernel
-        return kernel
+        return cls.get_kernel(response["name"], response["id"])
 
     @classmethod
     def shutdown_kernel(cls, kernel_id):
