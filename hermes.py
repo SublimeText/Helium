@@ -160,7 +160,7 @@ class KernelManager(object):
         return list(map(get_repr, cls.list_kernels()))
 
     @classmethod
-    def get_kernel(cls, kernelspec_name, kernel_id):
+    def get_kernel(cls, kernelspec_name, kernel_id, connection_name=None):
         """Get KernelConnection object."""
         if (kernelspec_name, kernel_id) in cls.kernels:
             return cls.kernels[(kernelspec_name, kernel_id)]
@@ -172,12 +172,14 @@ class KernelManager(object):
                     cls,
                     auth_type="token",
                     token=cls._token,
+                    connection_name=connection_name,
                     logger=HERMES_LOGGER)
             else:
                 kernel = KernelConnection(
                     kernelspec_name,
                     kernel_id,
                     cls,
+                    connection_name=connection_name,
                     logger=HERMES_LOGGER)
             cls.kernels[(kernelspec_name, kernel_id)] = kernel
             return kernel
@@ -190,7 +192,7 @@ class KernelManager(object):
         response = cls.post_request(
             url,
             data=json.dumps(data))
-        return cls.get_kernel(response["name"], response["id"])
+        return cls.get_kernel(response["name"], response["id"], connection_name=connection_name)
 
     @classmethod
     def shutdown_kernel(cls, kernel_id):
