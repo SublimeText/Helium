@@ -1,0 +1,4 @@
+Update in 0.4.2
+---------------
+
+Fixed the bug that the editor hangs up when view is connected to a dead kernel. 
