@@ -58,10 +58,10 @@ class ViewManager(object):
         kernel.activate_view()
 
     @classmethod
-    def remove_view(cls, view_name):
+    def remove_view(cls, buffer_id):
         """Remove view from manager."""
-        if view_name in cls.view_kernel_table:
-            del cls.view_kernel_table[view_name]
+        if buffer_id in cls.view_kernel_table:
+            del cls.view_kernel_table[buffer_id]
 
     @classmethod
     def get_kernel_for_view(cls, buffer_id) -> KernelConnection:
@@ -200,6 +200,8 @@ class KernelManager(object):
         url = '{base_url}/api/kernels/{kernel_id}'.format(
             base_url=cls.base_url(),
             kernel_id=kernel_id)
+        name, = [name for name, i in cls.kernels if i == kernel_id]
+        del cls.kernels[(name, kernel_id)]
         cls.delete_request(url)
 
     @classmethod
@@ -265,7 +267,10 @@ class KernelManager(object):
             headers=header)
         if response.status_code != requests.codes.ok:
             response.raise_for_status()
-        return response.json()
+        try:
+            return response.json()
+        except ValueError:
+            return
 
 
 @chain_callbacks
@@ -646,6 +651,8 @@ def _shutdown_kernel(
             "Shutdown kernel {kernel_id}.").format(
             kernel_id=selected_kernel["id"])
         logger.info(log_info_msg)
+    ViewManager.remove_view(view.buffer_id())
+    view.set_status("hermes_connected_kernel", '')
     continue_cb()
 
 
@@ -794,6 +801,7 @@ class StatusBar(object):
         execution_state = self.kernel.execution_state
         if execution_state == "dead":
             # Stop when kernel is dead.
+            self.view.set_status("hermes_connected_kernel", '')
             return
         elif execution_state == "busy":
             pos = pos % (2 * self.width)
