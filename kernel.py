@@ -15,6 +15,7 @@ from uuid import uuid4
 from datetime import datetime
 import re
 
+import requests
 import websocket
 import sublime
 
@@ -226,6 +227,9 @@ class KernelConnection(object):
         self._kernel_id = kernel_id
         self.manager = manager
         self._session = uuid4().hex
+        self._http_url = '{base_url}/api/kernels/{kernel_id}'.format(
+            base_url=manager.base_url(),
+            kernel_id=quote(kernel_id))
         self._ws_url = '{base_ws_url}/api/kernels/{kernel_id}/channels?session_id={session_id}'.format(
             base_ws_url=manager.base_ws_url(),
             kernel_id=quote(kernel_id),
@@ -291,6 +295,12 @@ class KernelConnection(object):
                 kernel_id=self.kernel_id)
 
     def _create_connection(self, connect_kwargs=dict()):
+        try:
+            response = self.manager.get_request(self._http_url)
+            if response['id'] != self.kernel_id:
+                return None
+        except requests.RequestException:
+            return None
         if self._auth_type == "no_auth":
             sock = websocket.create_connection(
                 self._ws_url,
@@ -316,8 +326,9 @@ class KernelConnection(object):
             connect_kwargs = dict(timeout=timeout)
         else:
             connect_kwargs = dict()
-
         sock = self._create_connection(connect_kwargs)
+        if sock is None:
+            return None
         sock.send(json.dumps(message).encode())
         replies = []
         replied = False
@@ -555,7 +566,10 @@ class KernelConnection(object):
             sock = self._create_connection()
             if sock is not None:
                 sock.close()
-            return True
+                return True
+            else:
+                self._execution_state = 'dead'
+                return False
         except websocket.WebSocketException:
             # Now we consider the kernel dead if we can't connect via WebSocket.
             # There should be several case that kernel is not dead but we can't connect,
