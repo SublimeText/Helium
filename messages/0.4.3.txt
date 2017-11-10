@@ -1,0 +1,4 @@
+Update in 0.4.3
+---------------
+
+Fix to reuse an established WebSocket connection to Jupyter kernel. This should solve some performance issues.

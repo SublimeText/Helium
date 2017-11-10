@@ -895,5 +895,5 @@ class HermesCompleter(EventListener):
                 (completion + "\tHermes", completion)
                 for completion
                 in kernel.get_complete(code, col, timeout)]
-        except (KeyError, WebSocketTimeoutException):
+        except Exception:
             return None
