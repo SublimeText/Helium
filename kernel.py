@@ -2,9 +2,7 @@
 
 KernelConnection class provides interaction with Jupyter kernels.
 
-by NEGORO Tetsuya, 2017
-This code is under GPL2 License.
-All rights are reserved.
+Copyright (c) 2017, NEGORO Tetsuya (https://github.com/ngr-t)
 """
 
 from threading import Thread
@@ -294,13 +292,28 @@ class KernelConnection(object):
                 lang=self.lang,
                 kernel_id=self.kernel_id)
 
-    def _create_connection(self, connect_kwargs=dict()):
+    def _ping(self) -> bool:
+        try:
+            self.sock.ping()
+            frame = self.sock.recv_frame()
+            if frame.opcode == websocket.ABNF.OPCODE_PONG:
+                return True
+            return False
+        except Exception as ex:
+            return False
+
+    def _establish_ws_connection(self, connect_kwargs: dict=dict()) -> None:
+        # Send ping and check if connection is alive.
+        if self._ping():
+            return
+        else:
+            self.sock = None
         try:
             response = self.manager.get_request(self._http_url)
             if response['id'] != self.kernel_id:
-                return None
+                return
         except requests.RequestException:
-            return None
+            return
         if self._auth_type == "no_auth":
             sock = websocket.create_connection(
                 self._ws_url,
@@ -317,7 +330,12 @@ class KernelConnection(object):
             sock = websocket.create_connection(
                 self._ws_url,
                 header=header)
-        return sock
+        self.sock = sock
+        if not self._ping():
+            # Connection can't be established (ex. when the kernel is dead)
+            # Should we show some message in this case,
+            # and let users to make a new connection?
+            self.sock = None
 
     def _communicate(self, message, timeout=None) -> JupyterReply:
         """Send `message` to the kernel and return `reply` for it."""
@@ -326,10 +344,10 @@ class KernelConnection(object):
             connect_kwargs = dict(timeout=timeout)
         else:
             connect_kwargs = dict()
-        sock = self._create_connection(connect_kwargs)
-        if sock is None:
+        self._establish_ws_connection(connect_kwargs)
+        if self.sock is None:
             return None
-        sock.send(json.dumps(message).encode())
+        self.sock.send(json.dumps(message).encode())
         replies = []
         replied = False
         while True:
@@ -337,7 +355,7 @@ class KernelConnection(object):
             # The code to interpret reply messages is devided into here and `JupyterReply` class.
             # Maybe it's better choice to remove `JupyterReply` class and
             # let all message interpretation processed here.
-            reply = json.loads(sock.recv())
+            reply = json.loads(self.sock.recv())
             replies.append(reply)
             self._logger.info(reply)
             msg_type = get_msg_type(reply)
@@ -361,7 +379,7 @@ class KernelConnection(object):
                         channel='stdin',
                         metadata={},
                         buffers={})
-                    sock.send(json.dumps(input_reply).encode())
+                    self.sock.send(json.dumps(input_reply).encode())
 
                 prompt = content["prompt"]
 
@@ -563,9 +581,8 @@ class KernelConnection(object):
     def is_alive(self):
         """Return True if kernel is alive."""
         try:
-            sock = self._create_connection()
-            if sock is not None:
-                sock.close()
+            self._establish_ws_connection()
+            if self.sock is not None:
                 return True
             else:
                 self._execution_state = 'dead'

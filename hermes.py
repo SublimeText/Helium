@@ -18,7 +18,6 @@ from sublime_plugin import (
 from .kernel import KernelConnection
 
 import requests
-from websocket import WebSocketTimeoutException
 
 from .utils import chain_callbacks
 
@@ -895,5 +894,5 @@ class HermesCompleter(EventListener):
                 (completion + "\tHermes", completion)
                 for completion
                 in kernel.get_complete(code, col, timeout)]
-        except (KeyError, WebSocketTimeoutException):
+        except Exception:
             return None
