@@ -302,7 +302,7 @@ class KernelConnection(object):
         except Exception as ex:
             return False
 
-    def _connect_socket(self, connect_kwargs: dict=dict()) -> None:
+    def _establish_ws_connection(self, connect_kwargs: dict=dict()) -> None:
         # Send ping and check if connection is alive.
         if self._ping():
             return
@@ -344,7 +344,7 @@ class KernelConnection(object):
             connect_kwargs = dict(timeout=timeout)
         else:
             connect_kwargs = dict()
-        self._connect_socket(connect_kwargs)
+        self._establish_ws_connection(connect_kwargs)
         if self.sock is None:
             return None
         self.sock.send(json.dumps(message).encode())
@@ -581,7 +581,7 @@ class KernelConnection(object):
     def is_alive(self):
         """Return True if kernel is alive."""
         try:
-            self._connect_socket()
+            self._establish_ws_connection()
             if self.sock is not None:
                 return True
             else:
@@ -616,7 +616,7 @@ class KernelConnection(object):
             metadata={},
             buffers={})
         reply = self._communicate(message, timeout)
-        return reply.matches if reply else None
+        return reply.matches
 
     def get_inspection(self, code, cursor_pos, detail_level=0, timeout=None):
         """Get object inspection by sending a `inspect_request` message to kernel."""
