@@ -18,7 +18,6 @@ from sublime_plugin import (
 from .kernel import KernelConnection
 
 import requests
-from websocket import WebSocketTimeoutException
 
 from .utils import chain_callbacks
 
