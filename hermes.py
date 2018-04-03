@@ -9,15 +9,18 @@ import re
 from functools import partial
 from logging import getLogger, INFO, StreamHandler
 
+import requests
+from jupyter_client.kernelspec import KernelSpecManager
+from jupyter_client.multikernelmanager import MultiKernelManager
+
 import sublime
 from sublime_plugin import (
     WindowCommand,
     TextCommand,
     EventListener,
-    ViewEventListener)
+    ViewEventListener
+)
 from .kernel import KernelConnection
-
-import requests
 
 from .utils import chain_callbacks
 
@@ -75,75 +78,31 @@ class KernelManager(object):
     # The key is a tuple consisted of the name of kernelspec and kernel ID,
     # the value is a KernelConnection instance correspond to it.
     kernels = dict()
+    kernel_spec_manager = KernelSpecManager()
+    multi_kernel_manager = MultiKernelManager()
 
     def __new__(cls, *args, **kwargs):
+        """Make this class a singleton."""
         if not hasattr(cls, "__instance__"):
             cls.__instance__ = super(KernelManager, object).__new__(
                 cls, *args, **kwargs)
         return cls.__instance__
 
-    def __init__(self, *args, **kwargs):
-        pass
-
-    @classmethod
-    def set_url(
-        cls,
-        base_url,
-        base_ws_url=None,
-        auth=None,
-        token=None
-    ):
-        """Initialize a kernel manager.
-
-        TODO: Deal with password authorization.
-        Importance is low because token authorization is possible.
-        """
-        base_url = base_url.rstrip("/")
-        if base_ws_url is None:
-            protocol, _, url_body = base_url.partition("://")
-            if protocol == "https":
-                base_ws_url = "wss://" + url_body
-            else:
-                base_ws_url = "ws://" + url_body
-        else:
-            base_ws_url = base_ws_url.rstrip("/")
-        cls._base_url = base_url
-        cls._base_ws_url = base_ws_url
-        cls._auth = auth
-        cls._token = token
-        try:
-            # Check if we can connect to the kernel gateway
-            # via passed information.
-            cls.list_kernelspecs()
-        except requests.RequestException:
-            # If we can't, remove member attributes.
-            sublime.message_dialog("Invalid URL or token.")
-            del cls._base_url
-            del cls._base_ws_url
-            del cls._auth
-            del cls._token
-
-    @classmethod
-    def base_url(cls):
-        """Base url of the jupyter process."""
-        return cls._base_url
-
-    @classmethod
-    def base_ws_url(cls):
-        """Base WebSocket URL of the jupyter process."""
-        return cls._base_ws_url
-
     @classmethod
     def list_kernelspecs(cls):
         """Get the kernelspecs."""
-        url = '{}/api/kernelspecs'.format(cls.base_url())
-        return cls.get_request(url)
+        return cls.kernel_spec_manager.get_all_specs()
 
     @classmethod
     def list_kernels(cls):
         """Get the list of kernels."""
-        url = '{}/api/kernels'.format(cls.base_url())
-        return cls.get_request(url)
+        return [
+            {'name': cls.multi_kernel_manager.get_kernel(kernel_id).kernel_name,
+             'id': kernel_id}
+            for kernel_id
+            in cls.multi_kernel_manager.list_kernel_ids()
+            if cls.multi_kernel_manager.get_kernel(kernel_id).is_alive()
+        ]
 
     @classmethod
     def list_kernel_reprs(cls):
@@ -186,139 +145,23 @@ class KernelManager(object):
     @classmethod
     def start_kernel(cls, kernelspec_name, connection_name=None):
         """Start kernel and return a `Kernel` instance."""
-        url = '{}/api/kernels'.format(cls.base_url())
-        data = dict(name=kernelspec_name)
-        response = cls.post_request(
-            url,
-            data=json.dumps(data))
-        return cls.get_kernel(response["name"], response["id"], connection_name=connection_name)
+        kernel_id = cls.multi_kernel_manager.start_kernel(kernel_name=kernelspec_name)
+        return cls.get_kernel(kernelspec_name, kernel_id, connection_name=connection_name)
 
     @classmethod
     def shutdown_kernel(cls, kernel_id):
         """Shutdown kernel."""
-        url = '{base_url}/api/kernels/{kernel_id}'.format(
-            base_url=cls.base_url(),
-            kernel_id=kernel_id)
-        name, = [name for name, i in cls.kernels if i == kernel_id]
-        del cls.kernels[(name, kernel_id)]
-        cls.delete_request(url)
+        cls.multi_kernel_manager.get_kernel(kernel_id).shutdown_kernel()
 
     @classmethod
     def restart_kernel(cls, kernel_id):
         """Restart kernel."""
-        url = '{base_url}/api/kernels/{kernel_id}/restart'.format(
-            base_url=cls.base_url(),
-            kernel_id=kernel_id)
-        cls.post_request(url, dict())
+        cls.multi_kernel_manager.get_kernel(kernel_id).shutdown_kernel(restart=True)
 
     @classmethod
     def interrupt_kernel(cls, kernel_id):
         """Interrupt kernel."""
-        url = '{base_url}/api/kernels/{kernel_id}/interrupt'.format(
-            base_url=cls.base_url(),
-            kernel_id=kernel_id)
-        cls.post_request(url, dict())
-
-    @classmethod
-    def post_request(cls, url, data) -> dict:
-        """Send a POST HTTP request to the `url` with `data` as a body and get response."""
-        if cls._token:
-            header_auth_body = "token {token}".format(
-                token=cls._token)
-            header = dict(Authorization=header_auth_body)
-        else:
-            header = dict()
-        response = requests.post(
-            url,
-            data=data,
-            headers=header)
-        if response.status_code != requests.codes.ok:
-            response.raise_for_status()
-        return response.json()
-
-    @classmethod
-    def get_request(cls, url) -> dict:
-        """Send a GET HTTP request to the `url` and get response."""
-        if cls._token:
-            header_auth_body = "token {token}".format(
-                token=cls._token)
-            header = dict(Authorization=header_auth_body)
-        else:
-            header = dict()
-        response = requests.get(
-            url,
-            headers=header)
-        if response.status_code != requests.codes.ok:
-            response.raise_for_status()
-        return response.json()
-
-    @classmethod
-    def delete_request(cls, url) -> dict:
-        """Send a DELETE HTTP request to the `url`."""
-        if cls._token:
-            header_auth_body = "token {token}".format(
-                token=cls._token)
-            header = dict(Authorization=header_auth_body)
-        else:
-            header = dict()
-        response = requests.delete(
-            url,
-            headers=header)
-        if response.status_code != requests.codes.ok:
-            response.raise_for_status()
-        try:
-            return response.json()
-        except ValueError:
-            return
-
-
-@chain_callbacks
-def _connect_server(window, *, continue_cb=lambda: None):
-    settings = sublime.load_settings("Hermes.sublime-settings")
-    connections = settings.get("connections", [])
-    connection_menu_items = [
-        [connection["name"], connection["url"]]
-        for connection in connections
-    ]
-    connection_menu_items += [["New", "Input a new URL."]]
-
-    connection_id = yield partial(
-        window.show_quick_panel,
-        connection_menu_items)
-    if connection_id == -1:
-        return
-    elif connection_id == len(connection_menu_items) - 1:
-        # When 'new' is chosen.
-        url = yield lambda cb: window.show_input_panel(
-            'URL: ',
-            '',
-            cb,
-            on_change=lambda x: None,
-            on_cancel=lambda: None)
-    else:
-        url = connections[connection_id]["url"]
-    try:
-        token = connections[connection_id]["token"]
-    except (KeyError, IndexError):
-        token = yield lambda cb: window.show_input_panel(
-            "token",
-            "",
-            cb,
-            lambda x: None,
-            lambda: None)
-    if token:
-        KernelManager.set_url(url, token=token)
-    else:
-        KernelManager.set_url(url)
-    continue_cb()
-
-
-class HermesConnectServer(WindowCommand):
-    """Set url of jupyter process."""
-
-    def run(self):
-        """Command."""
-        _connect_server(self.window)
+        cls.multi_kernel_manager.get_kernel(kernel_id).interrupt_kernel()
 
 
 @chain_callbacks
@@ -329,15 +172,8 @@ def _start_kernel(
     *,
     logger=HERMES_LOGGER
 ):
-    try:
-        kernelspecs = KernelManager.list_kernelspecs()
-    except requests.RequestException:
-        sublime.message_dialog("Set URL first, please.")
-        window = sublime.active_window()
-        yield partial(_connect_server, window)
-
-    menu_items = list(kernelspecs["kernelspecs"].keys())
-
+    kernelspecs = KernelManager.list_kernelspecs()
+    menu_items = list(kernelspecs.keys())
     index = yield partial(
         window.show_quick_panel,
         menu_items)
@@ -469,13 +305,7 @@ def _connect_kernel(
     continue_cb=lambda: None,
     logger=HERMES_LOGGER
 ):
-    try:
-        kernel_list = KernelManager.list_kernels()
-    except (requests.RequestException, AttributeError):
-        sublime.message_dialog("Set URL first, please.")
-        yield lambda cb: _connect_server(window, continue_cb=cb)
-        kernel_list = KernelManager.list_kernels()
-
+    kernel_list = KernelManager.list_kernels()
     menu_items = [
         "[{lang}] {kernel_id}".format(
             lang=kernel["name"],
@@ -534,13 +364,9 @@ def _show_kernel_selection_menu(window, view, cb, *, add_new=False):
         else:
             current_kernel_id = ""
 
-    # It's better to pass the list of (connection_name, kernel_id) tuples to improve the appearane of the menu.
-    try:
-        kernel_list = KernelManager.list_kernels()
-    except (requests.RequestException, AttributeError):
-        sublime.message_dialog("Connect to Jupyter first, please.")
-        yield lambda cb: _connect_server(window, continue_cb=cb)
-        kernel_list = KernelManager.list_kernels()
+    # It's better to pass the list of (connection_name, kernel_id) tuples
+    # to improve the appearane of the menu.
+    kernel_list = KernelManager.list_kernels()
     menu_items = [
         "* " + repr if kernel["id"] == current_kernel_id else repr
         for repr, kernel
@@ -587,7 +413,7 @@ class HermesInterruptKernel(TextCommand):
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except KeyError:
             return False
-        return kernel.is_alive()
+        return KernelManager.multi_kernel_manager.get_kernel(kernel.kernel_id).is_alive()
 
     def is_visible(self, *, logger=HERMES_LOGGER):
         return self.is_enabled()
@@ -624,7 +450,7 @@ class HermesRestartKernel(TextCommand):
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except KeyError:
             return False
-        return kernel.is_alive()
+        return KernelManager.multi_kernel_manager.get_kernel(kernel.kernel_id).is_alive()
 
     def is_visible(self, *, logger=HERMES_LOGGER):
         return self.is_enabled()
@@ -663,7 +489,7 @@ class HermesShutdownKernel(TextCommand):
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except KeyError:
             return False
-        return kernel.is_alive()
+        return KernelManager.multi_kernel_manager.get_kernel(kernel.kernel_id).is_alive()
 
     def is_visible(self, *, logger=HERMES_LOGGER):
         return self.is_enabled()
@@ -757,7 +583,7 @@ class HermesExecuteBlock(TextCommand):
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except KeyError:
             return False
-        return kernel.is_alive()
+        return KernelManager.multi_kernel_manager.get_kernel(kernel.kernel_id).is_alive()
 
     def is_visible(self, *, logger=HERMES_LOGGER):
         return self.is_enabled()
@@ -833,7 +659,7 @@ class HermesGetObjectInspection(TextCommand):
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except KeyError:
             return False
-        return kernel.is_alive()
+        return KernelManager.multi_kernel_manager.get_kernel(kernel.kernel_id).is_alive()
 
     def is_visible(self, *, logger=HERMES_LOGGER):
         return self.is_enabled()
