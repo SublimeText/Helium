@@ -54,8 +54,7 @@ class ViewManager(object):
     @classmethod
     def connect_kernel(cls, buffer_id, lang, kernel_id):
         """Connect view to kernel."""
-        kernel = KernelManager.get_kernel(
-            lang, kernel_id)
+        kernel = KernelManager.get_kernel(kernel_id)
         cls.view_kernel_table[buffer_id] = kernel
         kernel.activate_view()
 
@@ -80,6 +79,7 @@ class KernelManager(object):
     kernels = dict()
     kernel_spec_manager = KernelSpecManager()
     multi_kernel_manager = MultiKernelManager()
+    logger = HERMES_LOGGER
 
     def __new__(cls, *args, **kwargs):
         """Make this class a singleton."""
@@ -118,35 +118,20 @@ class KernelManager(object):
         return list(map(get_repr, cls.list_kernels()))
 
     @classmethod
-    def get_kernel(cls, kernelspec_name, kernel_id, connection_name=None):
+    def get_kernel(cls, kernel_id, connection_name=None):
         """Get KernelConnection object."""
-        if (kernelspec_name, kernel_id) in cls.kernels:
-            return cls.kernels[(kernelspec_name, kernel_id)]
-        else:
-            if cls._token:
-                kernel = KernelConnection(
-                    kernelspec_name,
-                    kernel_id,
-                    cls,
-                    auth_type="token",
-                    token=cls._token,
-                    connection_name=connection_name,
-                    logger=HERMES_LOGGER)
-            else:
-                kernel = KernelConnection(
-                    kernelspec_name,
-                    kernel_id,
-                    cls,
-                    connection_name=connection_name,
-                    logger=HERMES_LOGGER)
-            cls.kernels[(kernelspec_name, kernel_id)] = kernel
-            return kernel
+        return KernelConnection(
+            kernel_id,
+            cls,
+            connection_name=connection_name,
+            logger=cls.logger
+        )
 
     @classmethod
     def start_kernel(cls, kernelspec_name, connection_name=None):
         """Start kernel and return a `Kernel` instance."""
         kernel_id = cls.multi_kernel_manager.start_kernel(kernel_name=kernelspec_name)
-        return cls.get_kernel(kernelspec_name, kernel_id, connection_name=connection_name)
+        return cls.get_kernel(kernel_id, connection_name=connection_name)
 
     @classmethod
     def shutdown_kernel(cls, kernel_id):
@@ -256,7 +241,7 @@ def _list_kernels(window, view, *, logger=HERMES_LOGGER):
         logger.info(log_info_msg)
     elif subcommands[index] is sc.rename:
         # Rename
-        conn = KernelManager.get_kernel(selected_kernel["name"], selected_kernel["id"])
+        conn = KernelManager.get_kernel(selected_kernel["id"])
         curr_name = conn.connection_name if conn.connection_name is not None else ""
         new_name = yield partial(window.show_input_panel, "New name", curr_name, on_change=None, on_cancel=None)
         conn.connection_name = new_name
@@ -715,10 +700,11 @@ class HermesCompleter(EventListener):
             kernel = ViewManager.get_kernel_for_view(view.buffer_id())
             location = locations[0]
             code = view.substr(view.line(location))
+            log_info_msg = "Requested completion for code {code} with kernel {kernel_id}".format(
+                code=code,
+                kernel_id=kernel.kernel_id)
+            logger.info(log_info_msg)
             _, col = view.rowcol(location)
-            return [
-                (completion + "\tHermes", completion)
-                for completion
-                in kernel.get_complete(code, col, timeout)]
+            return kernel.get_complete(code, col, timeout)
         except Exception:
             return None

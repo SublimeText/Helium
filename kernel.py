@@ -5,13 +5,13 @@ KernelConnection class provides interaction with Jupyter kernels.
 Copyright (c) 2017, NEGORO Tetsuya (https://github.com/ngr-t)
 """
 
-from threading import Thread
-from queue import Queue
-from urllib.parse import quote
 import json
+import re
+from threading import Thread
+from queue import Empty, Queue
+from urllib.parse import quote
 from uuid import uuid4
 from datetime import datetime
-import re
 
 import requests
 import websocket
@@ -195,24 +195,18 @@ class KernelConnection(object):
             # TODO: log
             while True:
                 try:
-                    message, callback = self.message_queue.get()
-                    reply = self._kernel._communicate(message)
+                    callback = self.message_queue.get()
+                    reply = self._kernel._get_message()
                     callback(reply)
-                except Exception as err:
-                    print(err)
+                except Exception as ex:
+                    self._kernel._logger.exception(ex)
 
     def __init__(
         self,
-        lang,
         kernel_id,
         manager,
-        username=None,
-        auth_type=("no_auth", "password", "token")[0],
-        *,
-        auth_info=None,
-        token=None,
+        connection_name=None,
         logger=None,
-        connection_name=None
     ):
         """Initialize KernelConnection class.
 
@@ -221,35 +215,19 @@ class KernelConnection(object):
         kernel_id str: kernel ID
         manager parent kernel manager
         """
-        self._lang = lang
         self._kernel_id = kernel_id
         self.manager = manager
-        self._session = uuid4().hex
-        self._http_url = '{base_url}/api/kernels/{kernel_id}'.format(
-            base_url=manager.base_url(),
-            kernel_id=quote(kernel_id))
-        self._ws_url = '{base_ws_url}/api/kernels/{kernel_id}/channels?session_id={session_id}'.format(
-            base_ws_url=manager.base_ws_url(),
-            kernel_id=quote(kernel_id),
-            session_id=quote(self._session))
-        self._async_communicator = KernelConnection.AsyncCommunicator(self)
-        self._async_communicator.start()
-        self._logger = logger
-        self._auth_type = auth_type
-        self._auth_info = auth_info
-        self._token = token
-        self._execution_state = 'unknown'
+        self.kernel_manager = manager.multi_kernel_manager.get_kernel(kernel_id)
+        self.client = self.kernel_manager.client()
+        self.blocking_client = self.kernel_manager.blocking_client()
         self._connection_name = connection_name
-        if username is None:
-            self._username = (
-                sublime
-                .load_settings("Hermes.sublime-settings")
-                .get("username", ""))
+        self._execution_state = 'unknown'
+        self._logger = logger
 
     @property
     def lang(self):
         """Language of kernel."""
-        return self._lang
+        return self.kernel_manager.kernel_name
 
     @property
     def kernel_id(self):
@@ -292,62 +270,9 @@ class KernelConnection(object):
                 lang=self.lang,
                 kernel_id=self.kernel_id)
 
-    def _ping(self) -> bool:
-        try:
-            self.sock.ping()
-            frame = self.sock.recv_frame()
-            if frame.opcode == websocket.ABNF.OPCODE_PONG:
-                return True
-            return False
-        except Exception as ex:
-            return False
-
-    def _establish_ws_connection(self, connect_kwargs: dict=dict()) -> None:
-        # Send ping and check if connection is alive.
-        if self._ping():
-            return
-        else:
-            self.sock = None
-        try:
-            response = self.manager.get_request(self._http_url)
-            if response['id'] != self.kernel_id:
-                return
-        except requests.RequestException:
-            return
-        if self._auth_type == "no_auth":
-            sock = websocket.create_connection(
-                self._ws_url,
-                **connect_kwargs)
-        elif self._auth_type == "password":
-            sock = websocket.create_connection(
-                self._ws_url,
-                http_proxy_auth=self._auth_info,
-                **connect_kwargs)
-        elif self._auth_type == "token":
-            header_auth_body = "token {token}".format(
-                token=self._token)
-            header = dict(Authorization=header_auth_body)
-            sock = websocket.create_connection(
-                self._ws_url,
-                header=header)
-        self.sock = sock
-        if not self._ping():
-            # Connection can't be established (ex. when the kernel is dead)
-            # Should we show some message in this case,
-            # and let users to make a new connection?
-            self.sock = None
-
-    def _communicate(self, message, timeout=None) -> JupyterReply:
+    def _get_message(self, timeout=None, blocking=False) -> JupyterReply:
         """Send `message` to the kernel and return `reply` for it."""
         # Use `create_connection`'s default value unless `timeout` is set.
-        if timeout is not None:
-            connect_kwargs = dict(timeout=timeout)
-        else:
-            connect_kwargs = dict()
-        self._establish_ws_connection(connect_kwargs)
-        if self.sock is None:
-            return None
-        self.sock.send(json.dumps(message).encode())
         replies = []
         replied = False
         while True:
@@ -355,7 +280,10 @@ class KernelConnection(object):
             # The code to interpret reply messages is devided into here and `JupyterReply` class.
             # Maybe it's better choice to remove `JupyterReply` class and
             # let all message interpretation processed here.
-            reply = json.loads(self.sock.recv())
+            if blocking:
+                reply = self.blocking_client.get_shell_msg()
+            else:
+                reply = self.client.get_shell_msg()
             replies.append(reply)
             self._logger.info(reply)
             msg_type = get_msg_type(reply)
@@ -405,8 +333,8 @@ class KernelConnection(object):
         reply_obj = JupyterReply(replies, logger=self._logger)
         return reply_obj
 
-    def _async_communicate(self, message, callback):
-        self._async_communicator.message_queue.put((message, callback))
+    def _get_message_async(self, callback):
+        self._async_communicator.message_queue.put(callback)
 
     def _gen_header(self, msg_type):
         return dict(
@@ -461,21 +389,22 @@ class KernelConnection(object):
             # Just there is no error.
             pass
 
-    def _handle_inspect_reply(self, reply: JupyterReply):
+    def _handle_inspect_reply(self, reply: dict):
         window = sublime.active_window()
         if window.find_output_panel(HERMES_OBJECT_INSPECT_PANEL) is not None:
             window.destroy_output_panel(HERMES_OBJECT_INSPECT_PANEL)
         view = window.create_output_panel(HERMES_OBJECT_INSPECT_PANEL)
         try:
-            text = remove_ansi_escape(reply.inspect_data["text/plain"])
+            self._logger.debug(reply)
+            text = remove_ansi_escape(reply["text/plain"])
             view.run_command(
                 'append',
                 {'characters': text})
             window.run_command(
                 'show_panel',
                 dict(panel="output." + HERMES_OBJECT_INSPECT_PANEL))
-        except KeyError:
-            pass
+        except KeyError as ex:
+            self._logger.exception(ex)
 
     def _write_out_execution_count(self, reply: JupyterReply) -> None:
         self._write_text_to_view("\nOut[{}]: ".format(reply.execution_count))
@@ -560,39 +489,14 @@ class KernelConnection(object):
                 # Separator should be written if an undealt error occur while handling reply.
                 self._write_text_to_view("\n\n" + OUTPUT_VIEW_SEPARATOR + "\n\n")
 
-        header = self._gen_header(MSG_TYPE_EXECUTE_REQUEST)
-        content = dict(
-            code=code,
-            silent=False,
-            store_history=True,
-            user_expressions={},
-            allow_stdin=True)
-        message = dict(
-            header=header,
-            parent_header={},
-            channel='shell',
-            content=content,
-            metadata={},
-            buffers={})
-        self._async_communicate(message, callback)
+        self.client.execute(code)
+        self._get_message_async(callback)
         info_message = "Kernel executed code ```{code}```.".format(code=code)
         self._logger.info(info_message)
 
     def is_alive(self):
         """Return True if kernel is alive."""
-        try:
-            self._establish_ws_connection()
-            if self.sock is not None:
-                return True
-            else:
-                self._execution_state = 'dead'
-                return False
-        except websocket.WebSocketException:
-            # Now we consider the kernel dead if we can't connect via WebSocket.
-            # There should be several case that kernel is not dead but we can't connect,
-            # i.e. temporary bad condition of network. Should we distinguish these cases?
-            self._execution_state = 'dead'
-            return False
+        return self.manager.is_alive()
 
     @property
     def execution_state(self):
@@ -600,41 +504,38 @@ class KernelConnection(object):
 
     def get_complete(self, code, cursor_pos, timeout=None):
         """Generate complete request."""
-        header = self._gen_header(MSG_TYPE_COMPLETE_REQUEST)
-        content = dict(
-            code=code,
-            cursor_pos=cursor_pos,
-            silent=False,
-            store_history=True,
-            user_expressions={},
-            allow_stdin=False)
-        message = dict(
-            header=header,
-            parent_header={},
-            channel='shell',
-            content=content,
-            metadata={},
-            buffers={})
-        reply = self._communicate(message, timeout)
-        return reply.matches
+        self.blocking_client.complete(code, cursor_pos)
+        try:
+            recv_msg = self.blocking_client.get_shell_msg(timeout=timeout)
+            recv_content = recv_msg['content']
+            self._logger.info(recv_content)
+            if '_jupyter_types_experimental' in recv_content.get('metadata', {}):
+                # If the reply has typing metadata, use it.
+                # This metadata for typing is obviously experimental
+                # and not documented yet.
+                return [
+                    (match['text'] + '\t' + match['type'], match['text'])
+                    for match
+                    in recv_content['metadata']['_jupyter_types_experimental']
+                ]
+            else:
+                # Just say the completion is came from this plugin, otherwise.
+                return [
+                    (match + '\tHermes', match)
+                    for match
+                    in recv_content['matches']
+                ]
+        except Empty:
+            self._logger.info("Completion timeout.")
+        except Exception as ex:
+            self._logger.exception(ex)
+        return []
 
     def get_inspection(self, code, cursor_pos, detail_level=0, timeout=None):
         """Get object inspection by sending a `inspect_request` message to kernel."""
-        header = self._gen_header(MSG_TYPE_INSPECT_REQUEST)
-        content = dict(
-            code=code,
-            cursor_pos=cursor_pos,
-            detail_level=detail_level,
-            silent=False,
-            store_history=False,
-            user_expressions={},
-            allow_stdin=False)
-        message = dict(
-            header=header,
-            parent_header={},
-            channel='shell',
-            content=content,
-            metadata={},
-            buffers={})
-        reply = self._communicate(message, timeout)
-        self._handle_inspect_reply(reply)
+        self.blocking_client.inspect(code, cursor_pos, detail_level)
+        try:
+            recv_msg = self.blocking_client.get_shell_msg(timeout=timeout)
+            self._handle_inspect_reply(recv_msg['content']['data'])
+        except Empty:
+            self._logger.info("Object inspection timeout.")
