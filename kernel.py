@@ -4,17 +4,11 @@ KernelConnection class provides interaction with Jupyter kernels.
 
 Copyright (c) 2017, NEGORO Tetsuya (https://github.com/ngr-t)
 """
-import json
 import re
 from collections import defaultdict
 from threading import Thread, RLock
 from queue import Empty, Queue
-from urllib.parse import quote
-from uuid import uuid4
-from datetime import datetime
 
-import requests
-import websocket
 import sublime
 
 from .utils import (
@@ -28,6 +22,7 @@ REPLY_STATUS_OK = "ok"
 REPLY_STATUS_ERROR = "error"
 REPLY_STATUS_ABORT = "abort"
 
+MSG_TYPE_EXECUTE_INPUT = 'execute_input'
 MSG_TYPE_EXECUTE_REQUEST = 'execute_request'
 MSG_TYPE_EXECUTE_RESULT = 'execute_result'
 MSG_TYPE_EXECUTE_REPLY = 'execute_reply'
@@ -79,105 +74,6 @@ def extract_data(result):
         return ""
 
 
-class JupyterReply(object):
-    """Parse replies from Jupyter."""
-
-    def __init__(self, messages, message_type="execute", *, logger=None):
-        """Parse message and initialize self."""
-        self._display_data = []
-        self._stream_stdout = []
-        self._stream_stderr = []
-        self._stream_other = []
-        for message in messages:
-            logger.info(message)
-            content = message.get("content", dict())
-            if "execution_count" in content:
-                self._execution_count = content["execution_count"]
-            msg_type = get_msg_type(message)
-            # switch by msg_type.
-            if msg_type.endswith("_reply"):
-                self._status = content["status"]
-            if msg_type == MSG_TYPE_COMPLETE_REPLY:
-                self._matches = content["matches"]
-            elif msg_type == MSG_TYPE_INSPECT_REPLY:
-                found = content["found"]
-                if found:
-                    self._inspect_data = content["data"]
-                else:
-                    self._inspect_data = "No object inspection found."
-            elif msg_type == MSG_TYPE_ERROR:
-                self._ename = content["ename"]
-                self._evalue = content["evalue"]
-                self._traceback = content["traceback"]
-            elif msg_type == MSG_TYPE_DISPLAY_DATA:
-                self._display_data.append(content["data"])
-            elif msg_type == MSG_TYPE_EXECUTE_RESULT:
-                self._execute_result = content["data"]
-            elif msg_type == MSG_TYPE_STREAM:
-                if content["name"] == "stdout":
-                    self._stream_stdout.append(content["text"])
-                elif content["name"] == "stderr":
-                    self._stream_stderr.append(content["text"])
-                else:
-                    self._stream_other.append(content["text"])
-            elif msg_type == MSG_TYPE_STATUS:
-                self._execution_state = content["execution_state"]
-
-    @property
-    def status(self):
-        return self._status
-
-    @property
-    def ename(self):
-        return self._ename
-
-    @property
-    def evalue(self):
-        return self._evalue
-
-    @property
-    def traceback(self):
-        return self._traceback
-
-    @property
-    def execution_count(self):
-        return self._execution_count
-
-    @property
-    def display_data(self):
-        try:
-            return self._display_data
-        except AttributeError:
-            return [dict()]
-
-    @property
-    def execute_result(self):
-        try:
-            return self._execute_result
-        except AttributeError:
-            return dict()
-
-    @property
-    def stream_stdout(self):
-        return self._stream_stdout
-
-    @property
-    def stream_stderr(self):
-        return self._stream_stderr
-
-    @property
-    def stream_other(self):
-        return self._stream_other
-
-    @property
-    def matches(self):
-        return self._matches
-
-    @property
-    def inspect_data(self):
-        return self._inspect_data
-
-
 class KernelConnection(object):
     """Interact with a Jupyter kernel."""
 
@@ -195,11 +91,11 @@ class KernelConnection(object):
             while True:
                 try:
                     msg = self._kernel.client.get_shell_msg()
-                    self._kernel.message_queues_lock.acquire(True)
+                    self._kernel.shell_msg_queues_lock.acquire()
                     try:
-                        queue = self._kernel.shell_message_queues[msg['parent_header']['msg_id']]
+                        queue = self._kernel.shell_msg_queues[msg['parent_header']['msg_id']]
                     finally:
-                        self._kernel.message_queues_lock.release()
+                        self._kernel.shell_msg_queues_lock.release()
                     queue.put(msg)
                 except Exception as ex:
                     self._kernel._logger.exception(ex)
@@ -217,9 +113,65 @@ class KernelConnection(object):
             while True:
                 try:
                     msg = self._kernel.client.get_iopub_msg()
+                    self._kernel._logger.info(msg)
+                    content = msg.get("content", dict())
+                    execution_count = content.get("execution_count", None)
                     msg_type = msg['msg_type']
                     if msg_type == MSG_TYPE_STATUS:
-                        self._kernel._execution_state = msg['content']['execution_state']
+                        self._kernel._execution_state = content['execution_state']
+                    elif msg_type == MSG_TYPE_EXECUTE_INPUT:
+                        self._kernel._write_text_to_view("\n\n" + OUTPUT_VIEW_SEPARATOR + "\n\n")
+                        self._kernel._output_input_code(content['code'], content['execution_count'])
+                    elif msg_type == MSG_TYPE_ERROR:
+                        self._kernel._logger.info("Handling error")
+                        self._kernel._handle_error(
+                            execution_count,
+                            content["ename"],
+                            content["evalue"],
+                            content["traceback"],
+                        )
+                    elif msg_type == MSG_TYPE_DISPLAY_DATA:
+                        self._kernel._write_mime_data_to_view(content["data"])
+                    elif msg_type == MSG_TYPE_EXECUTE_RESULT:
+                        self._kernel._write_mime_data_to_view(content["data"])
+                    elif msg_type == MSG_TYPE_STREAM:
+                        self._kernel._handle_stream(content["name"], content["text"])
+                except Exception as ex:
+                    self._kernel._logger.exception(ex)
+
+    class StdInMessageReceiver(Thread):
+        """Receive and process IOPub messages."""
+
+        def __init__(self, kernel):
+            super().__init__()
+            self._kernel = kernel
+
+        def _handle_input_request(self, prompt, password):
+            def interrupt():
+                self.manager.interrupt_kernel(self.kernel_id)
+
+            if password:
+                show_password_input(prompt, send_input, interrupt)
+            else:
+                (sublime
+                 .active_window()
+                 .show_input_panel(
+                     prompt,
+                     "",
+                     self._kernel_connection.client.input,
+                     lambda x: None,
+                     interrupt
+                 ))
+
+        def run(self):
+            """Main routine."""
+            # TODO: log, handle other message types.
+            while True:
+                try:
+                    msg = self._kernel.client.get_stdin_msg()
+                    msg_type = msg['msg_type']
+                    if msg_type == MSG_TYPE_INPUT_REQUEST:
+                        self._handle_input_request(content["prompt"], content["password"])
                 except Exception as ex:
                     self._kernel._logger.exception(ex)
 
@@ -238,12 +190,12 @@ class KernelConnection(object):
         manager parent kernel manager
         """
         self._logger = logger
-        self.shell_message_queues = defaultdict(Queue)
+        self.shell_msg_queues = defaultdict(Queue)
         self._kernel_id = kernel_id
         self.manager = manager
         self.kernel_manager = manager.multi_kernel_manager.get_kernel(kernel_id)
         self.client = self.kernel_manager.client()
-        self.message_queues_lock = RLock()
+        self.shell_msg_queues_lock = RLock()
         self._connection_name = connection_name
         self._execution_state = 'unknown'
         # Set the attributes refered by receivers before they start.
@@ -251,6 +203,8 @@ class KernelConnection(object):
         self._shell_msg_receiver.start()
         self._iopub_msg_receiver = self.IOPubMessageReceiver(self)
         self._iopub_msg_receiver.start()
+        self._stdin_msg_receiver = self.StdInMessageReceiver(self)
+        self._stdin_msg_receiver.start()
 
     @property
     def lang(self):
@@ -302,83 +256,6 @@ class KernelConnection(object):
     def execution_state(self):
         return self._execution_state
 
-    def _get_message(self, timeout=None, blocking=False) -> JupyterReply:
-        """Send `message` to the kernel and return `reply` for it."""
-        # Use `create_connection`'s default value unless `timeout` is set.
-        replies = []
-        replied = False
-        while True:
-            # The code here requires refactoring.
-            # The code to interpret reply messages is devided into here and `JupyterReply` class.
-            # Maybe it's better choice to remove `JupyterReply` class and
-            # let all message interpretation processed here.
-            if blocking:
-                reply = self.blocking_client.get_shell_msg()
-            else:
-                reply = self.client.get_shell_msg()
-            replies.append(reply)
-            self._logger.info(reply)
-            msg_type = get_msg_type(reply)
-            if msg_type.endswith("_reply"):
-                # Kernel sends status first, or XX_reply first?
-                if self._execution_state == 'idle':
-                    break
-                replied = True
-            if msg_type == MSG_TYPE_STATUS:
-                self._execution_state = reply["content"]["execution_state"]
-                if self._execution_state == 'idle' and replied:
-                    break
-            elif msg_type == MSG_TYPE_INPUT_REQUEST:
-                content = reply["content"]
-
-                def send_input(value):
-                    input_reply = dict(
-                        header=self._gen_header(MSG_TYPE_INPUT_REPLY),
-                        parent_header=reply["header"],
-                        content=dict(value=value),
-                        channel='stdin',
-                        metadata={},
-                        buffers={})
-                    self.sock.send(json.dumps(input_reply).encode())
-
-                prompt = content["prompt"]
-
-                def interrupt():
-                    self.manager.interrupt_kernel(self.kernel_id)
-
-                if content["password"]:
-                    show_password_input(prompt, send_input, interrupt)
-
-                else:
-                    (
-                        sublime
-                        .active_window()
-                        .show_input_panel(
-                            prompt,
-                            "",
-                            send_input,
-                            lambda x: None,
-                            interrupt
-                        )
-                    )
-
-        reply_obj = JupyterReply(replies, logger=self._logger)
-        return reply_obj
-
-    def _get_message_async(self, callback):
-        self._async_communicator.message_queue.put(callback)
-
-    def _gen_header(self, msg_type):
-        return dict(
-            version=JUPYTER_PROTOCOL_VERSION,
-            kernel_id=self.kernel_id,
-            msg_id=uuid4().hex,
-            datetime=datetime.now().isoformat(),
-            msg_type=msg_type,
-            username=self._username,
-            session=self._session
-        )
-
     def activate_view(self):
         """Activate view to show the output of kernel."""
         view = self.get_view()
@@ -394,52 +271,20 @@ class KernelConnection(object):
             code=code)
         self._write_text_to_view(line)
 
-    def _handle_error(self, reply: JupyterReply) -> None:
-        try:
-            lines = "\nError[{execution_count}]: {ename}, {evalue}.\nTraceback:\n{traceback}".format(
-                execution_count=reply.execution_count,
-                ename=reply.ename,
-                evalue=reply.evalue,
-                traceback="\n".join(reply.traceback))
-            self._write_text_to_view(remove_ansi_escape(lines))
-        except AttributeError:
-            # Just there is no error.
-            pass
+    def _handle_error(self, execution_count, ename, evalue, traceback) -> None:
+        lines = "\nError[{execution_count}]: {ename}, {evalue}.\nTraceback:\n{traceback}".format(
+            execution_count=execution_count,
+            ename=ename,
+            evalue=evalue,
+            traceback="\n".join(traceback))
+        self._write_text_to_view(remove_ansi_escape(lines))
 
-    def _handle_stream(self, reply: JupyterReply) -> None:
+    def _handle_stream(self, name, text) -> None:
         # Currently don't consider real time catching of streams.
-        try:
-            lines = []
-            if len(reply.stream_stdout) > 0:
-                lines += ["\n(stdout):"] + reply.stream_stdout
-            if len(reply.stream_stderr) > 0:
-                lines += ["\n(stderr):"] + reply.stream_stderr
-            if len(reply.stream_other) > 0:
-                lines += ["\n(other stream):"] + reply.stream_other
-            self._write_text_to_view("\n".join(lines))
-        except AttributeError:
-            # Just there is no error.
-            pass
+        self._write_text_to_view("\n({name}):\n{text}".format(name, text))
 
-    def _handle_inspect_reply(self, reply: dict):
-        window = sublime.active_window()
-        if window.find_output_panel(HERMES_OBJECT_INSPECT_PANEL) is not None:
-            window.destroy_output_panel(HERMES_OBJECT_INSPECT_PANEL)
-        view = window.create_output_panel(HERMES_OBJECT_INSPECT_PANEL)
-        try:
-            self._logger.debug(reply)
-            text = remove_ansi_escape(reply["text/plain"])
-            view.run_command(
-                'append',
-                {'characters': text})
-            window.run_command(
-                'show_panel',
-                dict(panel="output." + HERMES_OBJECT_INSPECT_PANEL))
-        except KeyError as ex:
-            self._logger.exception(ex)
-
-    def _write_out_execution_count(self, reply: JupyterReply) -> None:
-        self._write_text_to_view("\nOut[{}]: ".format(reply.execution_count))
+    def _write_out_execution_count(self, execution_count) -> None:
+        self._write_text_to_view("\nOut[{}]: ".format(execution_count))
 
     def _write_text_to_view(self, text: str) -> None:
         self.activate_view()
@@ -490,6 +335,23 @@ class KernelConnection(object):
                 bgcolor="white")
             self._write_phantom(content)
 
+    def _handle_inspect_reply(self, reply: dict):
+        window = sublime.active_window()
+        if window.find_output_panel(HERMES_OBJECT_INSPECT_PANEL) is not None:
+            window.destroy_output_panel(HERMES_OBJECT_INSPECT_PANEL)
+        view = window.create_output_panel(HERMES_OBJECT_INSPECT_PANEL)
+        try:
+            self._logger.debug(reply)
+            text = remove_ansi_escape(reply["text/plain"])
+            view.run_command(
+                'append',
+                {'characters': text})
+            window.run_command(
+                'show_panel',
+                dict(panel="output." + HERMES_OBJECT_INSPECT_PANEL))
+        except KeyError as ex:
+            self._logger.exception(ex)
+
     def get_view(self):
         """Get view corresponds to the KernelConnection."""
         view = None
@@ -505,21 +367,7 @@ class KernelConnection(object):
 
     def execute_code(self, code):
         """Run code with Jupyter kernel."""
-        def callback(reply):
-            try:
-                self._output_input_code(code, reply.execution_count)
-                self._write_out_execution_count(reply)
-                self._handle_stream(reply)
-                for mime_data in reply.display_data:
-                    self._write_mime_data_to_view(mime_data)
-                self._write_mime_data_to_view(reply.execute_result)
-                self._handle_error(reply)
-            finally:
-                # Separator should be written if an undealt error occur while handling reply.
-                self._write_text_to_view("\n\n" + OUTPUT_VIEW_SEPARATOR + "\n\n")
-
-        self.client.execute(code)
-        self._get_message_async(callback)
+        msg_id = self.client.execute(code)
         info_message = "Kernel executed code ```{code}```.".format(code=code)
         self._logger.info(info_message)
 
@@ -530,11 +378,11 @@ class KernelConnection(object):
     def get_complete(self, code, cursor_pos, timeout=None):
         """Generate complete request."""
         msg_id = self.client.complete(code, cursor_pos)
-        self.message_queues_lock.acquire(True)
+        self.shell_msg_queues_lock.acquire()
         try:
-            queue = self.shell_message_queues[msg_id]
+            queue = self.shell_msg_queues[msg_id]
         finally:
-            self.message_queues_lock.release()
+            self.shell_msg_queues_lock.release()
 
         try:
             recv_msg = queue.get(timeout=timeout)
@@ -561,22 +409,22 @@ class KernelConnection(object):
         except Exception as ex:
             self._logger.exception(ex)
         finally:
-            self.message_queues_lock.acquire(True)
+            self.shell_msg_queues_lock.acquire()
             try:
-                self.shell_message_queues.pop(msg_id, None)
+                self.shell_msg_queues.pop(msg_id, None)
             finally:
-                self.message_queues_lock.release()
+                self.shell_msg_queues_lock.release()
 
         return []
 
     def get_inspection(self, code, cursor_pos, detail_level=0, timeout=None):
         """Get object inspection by sending a `inspect_request` message to kernel."""
         msg_id = self.client.inspect(code, cursor_pos, detail_level)
-        self.message_queues_lock.acquire(True)
+        self.shell_msg_queues_lock.acquire()
         try:
-            queue = self.shell_message_queues[msg_id]
+            queue = self.shell_msg_queues[msg_id]
         finally:
-            self.message_queues_lock.release()
+            self.shell_msg_queues_lock.release()
 
         try:
             recv_msg = queue.get(timeout=timeout)
@@ -585,8 +433,8 @@ class KernelConnection(object):
             self._logger.info("Object inspection timeout.")
 
         finally:
-            self.message_queues_lock.acquire(True)
+            self.shell_msg_queues_lock.acquire()
             try:
-                self.shell_message_queues.pop(msg_id, None)
+                self.shell_msg_queues.pop(msg_id, None)
             finally:
-                self.message_queues_lock.release()
+                self.shell_msg_queues_lock.release()

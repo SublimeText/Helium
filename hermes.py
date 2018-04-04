@@ -120,18 +120,20 @@ class KernelManager(object):
     @classmethod
     def get_kernel(cls, kernel_id, connection_name=None):
         """Get KernelConnection object."""
-        return KernelConnection(
-            kernel_id,
-            cls,
-            connection_name=connection_name,
-            logger=cls.logger
-        )
+        return cls.kernels[kernel_id]
 
     @classmethod
     def start_kernel(cls, kernelspec_name, connection_name=None):
         """Start kernel and return a `Kernel` instance."""
         kernel_id = cls.multi_kernel_manager.start_kernel(kernel_name=kernelspec_name)
-        return cls.get_kernel(kernel_id, connection_name=connection_name)
+        kernel = KernelConnection(
+            kernel_id,
+            cls,
+            connection_name=connection_name,
+            logger=cls.logger
+        )
+        cls.kernels[kernel_id] = kernel
+        return kernel
 
     @classmethod
     def shutdown_kernel(cls, kernel_id):
