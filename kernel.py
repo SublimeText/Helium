@@ -4,10 +4,10 @@ KernelConnection class provides interaction with Jupyter kernels.
 
 Copyright (c) 2017, NEGORO Tetsuya (https://github.com/ngr-t)
 """
-
 import json
 import re
-from threading import Thread
+from collections import defaultdict
+from threading import Thread, RLock
 from queue import Empty, Queue
 from urllib.parse import quote
 from uuid import uuid4
@@ -181,23 +181,45 @@ class JupyterReply(object):
 class KernelConnection(object):
     """Interact with a Jupyter kernel."""
 
-    class AsyncCommunicator(Thread):
-        """Communicator that runs  asynchroniously."""
+    class ShellMessageReceiver(Thread):
+        """Communicator that runs asynchroniously."""
 
         def __init__(self, kernel):
             """Initialize AsyncCommunicator class."""
-            super(KernelConnection.AsyncCommunicator, self).__init__()
+            super().__init__()
             self._kernel = kernel
-            self.message_queue = Queue()
 
         def run(self):
             """Main routine."""
             # TODO: log
             while True:
                 try:
-                    callback = self.message_queue.get()
-                    reply = self._kernel._get_message()
-                    callback(reply)
+                    msg = self._kernel.client.get_shell_msg()
+                    self._kernel.message_queues_lock.acquire(True)
+                    try:
+                        queue = self._kernel.shell_message_queues[msg['parent_header']['msg_id']]
+                    finally:
+                        self._kernel.message_queues_lock.release()
+                    queue.put(msg)
+                except Exception as ex:
+                    self._kernel._logger.exception(ex)
+
+    class IOPubMessageReceiver(Thread):
+        """Receive and process IOPub messages."""
+
+        def __init__(self, kernel):
+            super().__init__()
+            self._kernel = kernel
+
+        def run(self):
+            """Main routine."""
+            # TODO: log, handle other message types.
+            while True:
+                try:
+                    msg = self._kernel.client.get_iopub_msg()
+                    msg_type = msg['msg_type']
+                    if msg_type == MSG_TYPE_STATUS:
+                        self._kernel._execution_state = msg['content']['execution_state']
                 except Exception as ex:
                     self._kernel._logger.exception(ex)
 
@@ -215,14 +237,20 @@ class KernelConnection(object):
         kernel_id str: kernel ID
         manager parent kernel manager
         """
+        self._logger = logger
+        self.shell_message_queues = defaultdict(Queue)
         self._kernel_id = kernel_id
         self.manager = manager
         self.kernel_manager = manager.multi_kernel_manager.get_kernel(kernel_id)
         self.client = self.kernel_manager.client()
-        self.blocking_client = self.kernel_manager.blocking_client()
+        self.message_queues_lock = RLock()
         self._connection_name = connection_name
         self._execution_state = 'unknown'
-        self._logger = logger
+        # Set the attributes refered by receivers before they start.
+        self._shell_msg_receiver = self.ShellMessageReceiver(self)
+        self._shell_msg_receiver.start()
+        self._iopub_msg_receiver = self.IOPubMessageReceiver(self)
+        self._iopub_msg_receiver.start()
 
     @property
     def lang(self):
@@ -269,6 +297,10 @@ class KernelConnection(object):
             return "[{lang}] {kernel_id}".format(
                 lang=self.lang,
                 kernel_id=self.kernel_id)
+
+    @property
+    def execution_state(self):
+        return self._execution_state
 
     def _get_message(self, timeout=None, blocking=False) -> JupyterReply:
         """Send `message` to the kernel and return `reply` for it."""
@@ -458,9 +490,6 @@ class KernelConnection(object):
                 bgcolor="white")
             self._write_phantom(content)
 
-    def update_status_bar(self):
-        self._communicate()
-
     def get_view(self):
         """Get view corresponds to the KernelConnection."""
         view = None
@@ -496,17 +525,19 @@ class KernelConnection(object):
 
     def is_alive(self):
         """Return True if kernel is alive."""
-        return self.manager.is_alive()
-
-    @property
-    def execution_state(self):
-        return self._execution_state
+        return self.kernel_manager.is_alive()
 
     def get_complete(self, code, cursor_pos, timeout=None):
         """Generate complete request."""
-        self.blocking_client.complete(code, cursor_pos)
+        msg_id = self.client.complete(code, cursor_pos)
+        self.message_queues_lock.acquire(True)
         try:
-            recv_msg = self.blocking_client.get_shell_msg(timeout=timeout)
+            queue = self.shell_message_queues[msg_id]
+        finally:
+            self.message_queues_lock.release()
+
+        try:
+            recv_msg = queue.get(timeout=timeout)
             recv_content = recv_msg['content']
             self._logger.info(recv_content)
             if '_jupyter_types_experimental' in recv_content.get('metadata', {}):
@@ -529,13 +560,33 @@ class KernelConnection(object):
             self._logger.info("Completion timeout.")
         except Exception as ex:
             self._logger.exception(ex)
+        finally:
+            self.message_queues_lock.acquire(True)
+            try:
+                self.shell_message_queues.pop(msg_id, None)
+            finally:
+                self.message_queues_lock.release()
+
         return []
 
     def get_inspection(self, code, cursor_pos, detail_level=0, timeout=None):
         """Get object inspection by sending a `inspect_request` message to kernel."""
-        self.blocking_client.inspect(code, cursor_pos, detail_level)
+        msg_id = self.client.inspect(code, cursor_pos, detail_level)
+        self.message_queues_lock.acquire(True)
         try:
-            recv_msg = self.blocking_client.get_shell_msg(timeout=timeout)
+            queue = self.shell_message_queues[msg_id]
+        finally:
+            self.message_queues_lock.release()
+
+        try:
+            recv_msg = queue.get(timeout=timeout)
             self._handle_inspect_reply(recv_msg['content']['data'])
         except Empty:
             self._logger.info("Object inspection timeout.")
+
+        finally:
+            self.message_queues_lock.acquire(True)
+            try:
+                self.shell_message_queues.pop(msg_id, None)
+            finally:
+                self.message_queues_lock.release()
