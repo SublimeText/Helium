@@ -2,7 +2,7 @@
 
 KernelConnection class provides interaction with Jupyter kernels.
 
-Copyright (c) 2017, NEGORO Tetsuya (https://github.com/ngr-t)
+Copyright (c) 2017-2018, NEGORO Tetsuya (https://github.com/ngr-t)
 """
 import re
 from collections import defaultdict

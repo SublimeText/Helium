@@ -1,7 +1,8 @@
 """Hermes package for Sublime Text 3.
 
 The package provides code execution and completion in interaction with Jupyter.
-Copyright (c) 2016-2017, NEGORO Tetsuya (https://github.com/ngr-t)
+
+Copyright (c) 2016-2018, NEGORO Tetsuya (https://github.com/ngr-t)
 """
 
 import re
