@@ -4,18 +4,15 @@ The package provides code execution and completion in interaction with Jupyter.
 Copyright (c) 2016-2017, NEGORO Tetsuya (https://github.com/ngr-t)
 """
 
-import json
 import re
 from functools import partial
 from logging import getLogger, INFO, StreamHandler
 
-import requests
 from jupyter_client.kernelspec import KernelSpecManager
 from jupyter_client.multikernelmanager import MultiKernelManager
 
 import sublime
 from sublime_plugin import (
-    WindowCommand,
     TextCommand,
     EventListener,
     ViewEventListener
