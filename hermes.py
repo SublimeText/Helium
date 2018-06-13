@@ -5,11 +5,12 @@ The package provides code execution and completion in interaction with Jupyter.
 Copyright (c) 2016-2018, NEGORO Tetsuya (https://github.com/ngr-t)
 """
 
+import os
 import re
 from functools import partial
 from logging import getLogger, INFO, StreamHandler
 
-from jupyter_client.kernelspec import KernelSpecManager
+from jupyter_client.kernelspec import find_kernel_specs
 from jupyter_client.multikernelmanager import MultiKernelManager
 
 import sublime
@@ -33,6 +34,20 @@ if len(HERMES_LOGGER.handlers) == 0:
 
 # Regex patterns to extract code lines.
 INDENT_PATTERN = re.compile(r"^([ \t]*)")
+
+ORG_JUPYTER_PATH = os.environ.get('JUPYTER_PATH', '')
+settings = sublime.load_settings("Hermes.sublime-settings")
+
+
+def _refresh_jupyter_path():
+    additional_jupyter_path = settings.get('jupyter_path', '')
+    os.environ['JUPYTER_PATH'] = ':'.join((
+        ORG_JUPYTER_PATH,
+        additional_jupyter_path
+    ))
+
+
+settings.add_on_change('jupyter_path', _refresh_jupyter_path)
 
 
 class ViewManager(object):
@@ -75,7 +90,6 @@ class KernelManager(object):
     # The key is a tuple consisted of the name of kernelspec and kernel ID,
     # the value is a KernelConnection instance correspond to it.
     kernels = dict()
-    kernel_spec_manager = KernelSpecManager()
     multi_kernel_manager = MultiKernelManager()
     logger = HERMES_LOGGER
 
@@ -89,7 +103,7 @@ class KernelManager(object):
     @classmethod
     def list_kernelspecs(cls):
         """Get the kernelspecs."""
-        return cls.kernel_spec_manager.get_all_specs()
+        return find_kernel_specs()
 
     @classmethod
     def list_kernels(cls):
