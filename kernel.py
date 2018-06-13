@@ -151,14 +151,14 @@ class KernelConnection(object):
                 self.manager.interrupt_kernel(self.kernel_id)
 
             if password:
-                show_password_input(prompt, send_input, interrupt)
+                show_password_input(prompt, self._kernel.input, interrupt)
             else:
                 (sublime
                  .active_window()
                  .show_input_panel(
                      prompt,
                      "",
-                     self._kernel_connection.client.input,
+                     self._kernel.client.input,
                      lambda x: None,
                      interrupt
                  ))
@@ -170,6 +170,7 @@ class KernelConnection(object):
                 try:
                     msg = self._kernel.client.get_stdin_msg()
                     msg_type = msg['msg_type']
+                    content = msg['content']
                     if msg_type == MSG_TYPE_INPUT_REQUEST:
                         self._handle_input_request(content["prompt"], content["password"])
                 except Exception as ex:
