@@ -58,14 +58,18 @@ TEXT_PHANTOM = """<body id="hermes-result">
     .stdout {{ color: gray }}
     .error {{ color: var(--redish) }}
     .other {{ color: var(--yellowish) }}
+    .closebutton {{ text-decoration: none }}
   </style>
+  <a class=closebutton href=hide>×</a>
   {content}
 </body>"""
 
 IMAGE_PHANTOM = """<body id="hermes-image-result">
   <style>
     .image {{ background-color: white }}
+    .closebutton {{ text-decoration: none }}
   </style>
+  <a class=closebutton href=hide>×</a>
   '<img class="image" alt="Out" src="data:image/png;base64,{data}" />
 </body>"""
 
@@ -544,13 +548,14 @@ class KernelConnection(object):
     def _write_inline_html_phantom(self, content: str):
         if self.parent_view:
             region = self.parent_view.sel()[-1]
-            id = HERMES_FIGURE_PHANTOMS
+            id = HERMES_FIGURE_PHANTOMS + datetime.now().isoformat()
             html = TEXT_PHANTOM.format(content=content)
             self.parent_view.add_phantom(
                 id,
                 region,
                 html,
-                sublime.LAYOUT_BLOCK)
+                sublime.LAYOUT_BLOCK,
+                on_navigate=lambda href, id=id: self.parent_view.erase_phantoms(id))
             self._logger.info("Created inline phantom {}".format(html))
         else:
             self._logger.error("Parent view not set, can't create html phantom")
@@ -558,13 +563,14 @@ class KernelConnection(object):
     def _write_inline_image_phantom(self, data: str):
         if self.parent_view:
             region = self.parent_view.sel()[-1]
-            id = HERMES_FIGURE_PHANTOMS
+            id = HERMES_FIGURE_PHANTOMS + datetime.now().isoformat()
             html = IMAGE_PHANTOM.format(data=data)
             self.parent_view.add_phantom(
                 id,
                 region,
                 html,
-                sublime.LAYOUT_BLOCK)
+                sublime.LAYOUT_BLOCK,
+                on_navigate=lambda href, id=id: self.parent_view.erase_phantoms(id))
             self._logger.info("Created inline phantom image")
         else:
             self._logger.error("Parent view not set, can't create phantom image")
