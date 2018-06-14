@@ -738,10 +738,10 @@ def _execute_block(view, *, logger=HERMES_LOGGER):
 
     pre_code = []
     for s in view.sel():
-        code, _ = get_block(view, s)
+        code, region = get_block(view, s)
         if code == pre_code:
             continue
-        kernel.execute_code(code)
+        kernel.execute_code(code, region)
         log_info_msg = "Executed code {code} with kernel {kernel_id}".format(
             code=code,
             kernel_id=kernel.kernel_id)

@@ -470,7 +470,7 @@ class KernelConnection(object):
             code=code)
         self._write_text_to_view(line)
 
-    def _handle_error(self, reply: JupyterReply) -> None:
+    def _handle_error(self, reply: JupyterReply, region: sublime.Region) -> None:
         try:
             lines = "\nError[{execution_count}]: {ename}, {evalue}.\nTraceback:\n{traceback}".format(
                 execution_count=reply.execution_count,
@@ -480,12 +480,12 @@ class KernelConnection(object):
             lines = remove_ansi_escape(lines)
             self._write_text_to_view(lines)
             phantom_html = ERROR_PHANTOM.format(content=fix_whitespace_for_phantom(lines))
-            self._write_inline_html_phantom(phantom_html)
+            self._write_inline_html_phantom(phantom_html, region)
         except AttributeError:
             # Just there is no error.
             pass
 
-    def _handle_stream(self, reply: JupyterReply) -> None:
+    def _handle_stream(self, reply: JupyterReply, region: sublime.Region) -> None:
         # Currently don't consider real time catching of streams.
         try:
             lines = []
@@ -501,7 +501,7 @@ class KernelConnection(object):
                 phantom_html += OTHER_PHANTOM.format(content=fix_whitespace_for_phantom('\n'.join(reply.stream_other)))
             self._write_text_to_view("\n".join(lines))
             if phantom_html:
-                self._write_inline_html_phantom(phantom_html)
+                self._write_inline_html_phantom(phantom_html, region)
         except AttributeError:
             # Just there is no error.
             pass
@@ -545,9 +545,9 @@ class KernelConnection(object):
             sublime.LAYOUT_BLOCK)
         self._logger.info("Created phantom {}".format(content))
 
-    def _write_inline_html_phantom(self, content: str):
+    def _write_inline_html_phantom(self, content: str, region: sublime.Region):
         if self.parent_view:
-            region = self.parent_view.sel()[-1]
+            #region = self.parent_view.sel()[-1]
             id = HERMES_FIGURE_PHANTOMS + datetime.now().isoformat()
             html = TEXT_PHANTOM.format(content=content)
             self.parent_view.add_phantom(
@@ -560,9 +560,9 @@ class KernelConnection(object):
         else:
             self._logger.error("Parent view not set, can't create html phantom")
 
-    def _write_inline_image_phantom(self, data: str):
+    def _write_inline_image_phantom(self, data: str, region: sublime.Region):
         if self.parent_view:
-            region = self.parent_view.sel()[-1]
+            #region = self.parent_view.sel()[-1]
             id = HERMES_FIGURE_PHANTOMS + datetime.now().isoformat()
             html = IMAGE_PHANTOM.format(data=data)
             self.parent_view.add_phantom(
@@ -575,7 +575,7 @@ class KernelConnection(object):
         else:
             self._logger.error("Parent view not set, can't create phantom image")
 
-    def _write_mime_data_to_view(self, mime_data: dict) -> None:
+    def _write_mime_data_to_view(self, mime_data: dict, region: sublime.Region) -> None:
         self.activate_view()
         if "text/plain" in mime_data:
             # Some kernel (such as IRkernel) sends text in display_data.
@@ -603,7 +603,7 @@ class KernelConnection(object):
                 data=data,
                 bgcolor="white")
             self._write_phantom(content)
-            self._write_inline_image_phantom(data)
+            self._write_inline_image_phantom(data, region)
 
     def update_status_bar(self):
         self._communicate()
@@ -621,17 +621,21 @@ class KernelConnection(object):
             view.set_name(view_name)
             return view
 
-    def execute_code(self, code):
+    def execute_code(self, code, phantom_region):
         """Run code with Jupyter kernel."""
+
+        # fix for sublime bug where phantoms are displayed after the first line in a multiline region
+        phantom_region = sublime.Region(phantom_region.end(), phantom_region.end())
+
         def callback(reply):
             try:
                 self._output_input_code(code, reply.execution_count)
                 self._write_out_execution_count(reply)
-                self._handle_stream(reply)
+                self._handle_stream(reply, region=phantom_region)
                 for mime_data in reply.display_data:
-                    self._write_mime_data_to_view(mime_data)
-                self._write_mime_data_to_view(reply.execute_result)
-                self._handle_error(reply)
+                    self._write_mime_data_to_view(mime_data, region=phantom_region)
+                self._write_mime_data_to_view(reply.execute_result, region=phantom_region)
+                self._handle_error(reply, region=phantom_region)
             finally:
                 # Separator should be written if an undealt error occur while handling reply.
                 self._write_text_to_view("\n\n" + OUTPUT_VIEW_SEPARATOR + "\n\n")
