@@ -53,6 +53,37 @@ ANSI_ESCAPE_PATTERN = re.compile(r'\x1b[^m]*m')
 
 OUTPUT_VIEW_SEPARATOR = "-" * 80
 
+TEXT_PHANTOM = """<body id="hermes-result">
+  <style>
+    .stdout {{ color: gray }}
+    .error {{ color: var(--redish) }}
+    .other {{ color: var(--yellowish) }}
+  </style>
+  {content}
+</body>"""
+
+IMAGE_PHANTOM = """<body id="hermes-image-result">
+  <style>
+    .image {{ background-color: white }}
+  </style>
+  '<img class="image" alt="Out" src="data:image/png;base64,{data}" />
+</body>"""
+
+STDOUT_PHANTOM = "<div class=stdout>{content}</div>"
+STDERR_PHANTOM = "<div class=error>{content}</div>"
+ERROR_PHANTOM  = "<div class=error>{content}</div>"
+OTHER_PHANTOM  = "<div class=other>{content}</div>"
+
+
+def fix_whitespace_for_phantom(text: str):
+    """Transform output for proper display
+
+    This is important to display pandas DataFrames, for instance
+    """
+    text = text.replace(' ', r'&nbsp;')
+    text = '<br>'.join(text.splitlines())
+    return text
+
 
 def extract_content(messages, msg_type):
     """Extract content from messages received from a kernel."""
@@ -423,6 +454,7 @@ class KernelConnection(object):
         """Activate view to show the output of kernel."""
         view = self.get_view()
         current_view = sublime.active_window().active_view()
+        self.parent_view = current_view
         sublime.active_window().focus_view(view)
         view.set_scratch(True)  # avoids prompting to save
         view.settings().set("word_wrap", "false")
@@ -441,7 +473,10 @@ class KernelConnection(object):
                 ename=reply.ename,
                 evalue=reply.evalue,
                 traceback="\n".join(reply.traceback))
-            self._write_text_to_view(remove_ansi_escape(lines))
+            lines = remove_ansi_escape(lines)
+            self._write_text_to_view(lines)
+            phantom_html = ERROR_PHANTOM.format(content=fix_whitespace_for_phantom(lines))
+            self._write_inline_html_phantom(phantom_html)
         except AttributeError:
             # Just there is no error.
             pass
@@ -450,13 +485,19 @@ class KernelConnection(object):
         # Currently don't consider real time catching of streams.
         try:
             lines = []
+            phantom_html = ""
             if len(reply.stream_stdout) > 0:
                 lines += ["\n(stdout):"] + reply.stream_stdout
+                phantom_html += STDOUT_PHANTOM.format(content=fix_whitespace_for_phantom('\n'.join(reply.stream_stdout)))
             if len(reply.stream_stderr) > 0:
                 lines += ["\n(stderr):"] + reply.stream_stderr
+                phantom_html += STDERR_PHANTOM.format(content=fix_whitespace_for_phantom('\n'.join(reply.stream_stderr)))
             if len(reply.stream_other) > 0:
                 lines += ["\n(other stream):"] + reply.stream_other
+                phantom_html += OTHER_PHANTOM.format(content=fix_whitespace_for_phantom('\n'.join(reply.stream_other)))
             self._write_text_to_view("\n".join(lines))
+            if phantom_html:
+                self._write_inline_html_phantom(phantom_html)
         except AttributeError:
             # Just there is no error.
             pass
@@ -500,6 +541,34 @@ class KernelConnection(object):
             sublime.LAYOUT_BLOCK)
         self._logger.info("Created phantom {}".format(content))
 
+    def _write_inline_html_phantom(self, content: str):
+        if self.parent_view:
+            region = self.parent_view.sel()[-1]
+            id = HERMES_FIGURE_PHANTOMS
+            html = TEXT_PHANTOM.format(content=content)
+            self.parent_view.add_phantom(
+                id,
+                region,
+                html,
+                sublime.LAYOUT_BLOCK)
+            self._logger.info("Created inline phantom {}".format(html))
+        else:
+            self._logger.error("Parent view not set, can't create html phantom")
+
+    def _write_inline_image_phantom(self, data: str):
+        if self.parent_view:
+            region = self.parent_view.sel()[-1]
+            id = HERMES_FIGURE_PHANTOMS
+            html = IMAGE_PHANTOM.format(data=data)
+            self.parent_view.add_phantom(
+                id,
+                region,
+                html,
+                sublime.LAYOUT_BLOCK)
+            self._logger.info("Created inline phantom image")
+        else:
+            self._logger.error("Parent view not set, can't create phantom image")
+
     def _write_mime_data_to_view(self, mime_data: dict) -> None:
         self.activate_view()
         if "text/plain" in mime_data:
@@ -518,16 +587,17 @@ class KernelConnection(object):
             content = mime_data["text/html"]
             self._write_phantom(content)
         if "image/png" in mime_data:
-            data = mime_data["image/png"]
+            data = mime_data["image/png"].strip()
             self._logger.info("Caught image.")
             content = (
                 '<body style="background-color:white">' +
                 '<img alt="Out" src="data:image/png;base64,{data}" />' +
                 '</body>'
             ).format(
-                data=data.strip(),
+                data=data,
                 bgcolor="white")
             self._write_phantom(content)
+            self._write_inline_image_phantom(data)
 
     def update_status_bar(self):
         self._communicate()
