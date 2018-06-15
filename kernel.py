@@ -6,7 +6,7 @@ Copyright (c) 2017-2018, NEGORO Tetsuya (https://github.com/ngr-t)
 """
 import re
 from collections import defaultdict
-from threading import Thread, RLock
+from threading import Event, Thread, RLock
 from queue import Empty, Queue
 
 import sublime
@@ -46,8 +46,6 @@ HERMES_OBJECT_INSPECT_PANEL = "hermes_object_inspect"
 
 ANSI_ESCAPE_PATTERN = re.compile(r'\x1b[^m]*m')
 
-OUTPUT_VIEW_SEPARATOR = "-" * 80
-
 
 def extract_content(messages, msg_type):
     """Extract content from messages received from a kernel."""
@@ -77,42 +75,46 @@ def extract_data(result):
 class KernelConnection(object):
     """Interact with a Jupyter kernel."""
 
-    class ShellMessageReceiver(Thread):
-        """Communicator that runs asynchroniously."""
+    class MessageReceiver(Thread):
 
         def __init__(self, kernel):
             """Initialize AsyncCommunicator class."""
             super().__init__()
             self._kernel = kernel
+            self.exit = Event()
+
+        def shutdown(self):
+            self.exit.set()
+
+    class ShellMessageReceiver(MessageReceiver):
+        """Communicator that runs asynchroniously."""
 
         def run(self):
             """Main routine."""
             # TODO: log
-            while True:
+            while not self.exit.is_set():
                 try:
-                    msg = self._kernel.client.get_shell_msg()
+                    msg = self._kernel.client.get_shell_msg(timeout=1)
                     self._kernel.shell_msg_queues_lock.acquire()
                     try:
                         queue = self._kernel.shell_msg_queues[msg['parent_header']['msg_id']]
                     finally:
                         self._kernel.shell_msg_queues_lock.release()
                     queue.put(msg)
+                except Empty:
+                    pass
                 except Exception as ex:
                     self._kernel._logger.exception(ex)
 
-    class IOPubMessageReceiver(Thread):
+    class IOPubMessageReceiver(MessageReceiver):
         """Receive and process IOPub messages."""
-
-        def __init__(self, kernel):
-            super().__init__()
-            self._kernel = kernel
 
         def run(self):
             """Main routine."""
             # TODO: log, handle other message types.
-            while True:
+            while not self.exit.is_set():
                 try:
-                    msg = self._kernel.client.get_iopub_msg()
+                    msg = self._kernel.client.get_iopub_msg(timeout=1)
                     self._kernel._logger.info(msg)
                     content = msg.get("content", dict())
                     execution_count = content.get("execution_count", None)
@@ -120,7 +122,7 @@ class KernelConnection(object):
                     if msg_type == MSG_TYPE_STATUS:
                         self._kernel._execution_state = content['execution_state']
                     elif msg_type == MSG_TYPE_EXECUTE_INPUT:
-                        self._kernel._write_text_to_view("\n\n" + OUTPUT_VIEW_SEPARATOR + "\n\n")
+                        self._kernel._write_text_to_view("\n\n")
                         self._kernel._output_input_code(content['code'], content['execution_count'])
                     elif msg_type == MSG_TYPE_ERROR:
                         self._kernel._logger.info("Handling error")
@@ -136,19 +138,17 @@ class KernelConnection(object):
                         self._kernel._write_mime_data_to_view(content["data"])
                     elif msg_type == MSG_TYPE_STREAM:
                         self._kernel._handle_stream(content["name"], content["text"])
+                except Empty:
+                    pass
                 except Exception as ex:
                     self._kernel._logger.exception(ex)
 
-    class StdInMessageReceiver(Thread):
+    class StdInMessageReceiver(MessageReceiver):
         """Receive and process IOPub messages."""
-
-        def __init__(self, kernel):
-            super().__init__()
-            self._kernel = kernel
 
         def _handle_input_request(self, prompt, password):
             def interrupt():
-                self.manager.interrupt_kernel(self.kernel_id)
+                self.parent.interrupt_kernel(self.kernel_id)
 
             if password:
                 show_password_input(prompt, self._kernel.input, interrupt)
@@ -166,20 +166,32 @@ class KernelConnection(object):
         def run(self):
             """Main routine."""
             # TODO: log, handle other message types.
-            while True:
+            while not self.exit.is_set():
                 try:
-                    msg = self._kernel.client.get_stdin_msg()
+                    msg = self._kernel.client.get_stdin_msg(timeout=1)
                     msg_type = msg['msg_type']
                     content = msg['content']
                     if msg_type == MSG_TYPE_INPUT_REQUEST:
                         self._handle_input_request(content["prompt"], content["password"])
+                except Empty:
+                    pass
                 except Exception as ex:
                     self._kernel._logger.exception(ex)
+
+    def _init_receivers(self):
+        # Set the attributes refered by receivers before they start.
+        self._shell_msg_receiver = self.ShellMessageReceiver(self)
+        self._shell_msg_receiver.start()
+        self._iopub_msg_receiver = self.IOPubMessageReceiver(self)
+        self._iopub_msg_receiver.start()
+        self._stdin_msg_receiver = self.StdInMessageReceiver(self)
+        self._stdin_msg_receiver.start()
 
     def __init__(
         self,
         kernel_id,
-        manager,
+        kernel_manager,
+        parent,
         connection_name=None,
         logger=None,
     ):
@@ -188,24 +200,24 @@ class KernelConnection(object):
         paramters
         ---------
         kernel_id str: kernel ID
-        manager parent kernel manager
+        parent parent kernel manager
         """
         self._logger = logger
         self.shell_msg_queues = defaultdict(Queue)
         self._kernel_id = kernel_id
-        self.manager = manager
-        self.kernel_manager = manager.multi_kernel_manager.get_kernel(kernel_id)
+        self.parent = parent
+        self.kernel_manager = kernel_manager
         self.client = self.kernel_manager.client()
+        self.client.start_channels()
         self.shell_msg_queues_lock = RLock()
         self._connection_name = connection_name
         self._execution_state = 'unknown'
-        # Set the attributes refered by receivers before they start.
-        self._shell_msg_receiver = self.ShellMessageReceiver(self)
-        self._shell_msg_receiver.start()
-        self._iopub_msg_receiver = self.IOPubMessageReceiver(self)
-        self._iopub_msg_receiver.start()
-        self._stdin_msg_receiver = self.StdInMessageReceiver(self)
-        self._stdin_msg_receiver.start()
+        self._init_receivers()
+
+    def __del__(self):
+        self._shell_msg_receiver.shutdown()
+        self._iopub_msg_receiver.shutdown()
+        self._stdin_msg_receiver.shutdown()
 
     @property
     def lang(self):
@@ -368,13 +380,13 @@ class KernelConnection(object):
 
     def execute_code(self, code):
         """Run code with Jupyter kernel."""
-        msg_id = self.client.execute(code)
+        self.client.execute(code)
         info_message = "Kernel executed code ```{code}```.".format(code=code)
         self._logger.info(info_message)
 
     def is_alive(self):
         """Return True if kernel is alive."""
-        return self.kernel_manager.is_alive()
+        return self.client.hb_channel.is_beating()
 
     def get_complete(self, code, cursor_pos, timeout=None):
         """Generate complete request."""

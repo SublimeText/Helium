@@ -5,13 +5,15 @@ The package provides code execution and completion in interaction with Jupyter.
 Copyright (c) 2016-2018, NEGORO Tetsuya (https://github.com/ngr-t)
 """
 
+import json
 import os
 import re
+import uuid
 from functools import partial
 from logging import getLogger, INFO, StreamHandler
 
 from jupyter_client.kernelspec import find_kernel_specs
-from jupyter_client.multikernelmanager import MultiKernelManager
+from jupyter_client.manager import KernelManager
 
 import sublime
 from sublime_plugin import (
@@ -47,6 +49,9 @@ def _refresh_jupyter_path():
     ))
 
 
+_refresh_jupyter_path()
+
+
 settings.add_on_change('jupyter_path', _refresh_jupyter_path)
 
 
@@ -67,7 +72,7 @@ class ViewManager(object):
     @classmethod
     def connect_kernel(cls, buffer_id, lang, kernel_id):
         """Connect view to kernel."""
-        kernel = KernelManager.get_kernel(kernel_id)
+        kernel = HermesKernelManager.get_kernel(kernel_id)
         cls.view_kernel_table[buffer_id] = kernel
         kernel.activate_view()
 
@@ -83,20 +88,19 @@ class ViewManager(object):
         return cls.view_kernel_table[buffer_id]
 
 
-class KernelManager(object):
+class HermesKernelManager(object):
     """Manage Jupyter kernels."""
 
     # type: Dict[Tuple[str, str], KernelConnection]
     # The key is a tuple consisted of the name of kernelspec and kernel ID,
     # the value is a KernelConnection instance correspond to it.
     kernels = dict()
-    multi_kernel_manager = MultiKernelManager()
     logger = HERMES_LOGGER
 
     def __new__(cls, *args, **kwargs):
         """Make this class a singleton."""
         if not hasattr(cls, "__instance__"):
-            cls.__instance__ = super(KernelManager, object).__new__(
+            cls.__instance__ = super(HermesKernelManager, object).__new__(
                 cls, *args, **kwargs)
         return cls.__instance__
 
@@ -109,11 +113,11 @@ class KernelManager(object):
     def list_kernels(cls):
         """Get the list of kernels."""
         return [
-            {'name': cls.multi_kernel_manager.get_kernel(kernel_id).kernel_name,
+            {'name': cls.get_kernel(kernel_id).lang,
              'id': kernel_id}
             for kernel_id
-            in cls.multi_kernel_manager.list_kernel_ids()
-            if cls.multi_kernel_manager.get_kernel(kernel_id).is_alive()
+            in cls.kernels.keys()
+            if cls.get_kernel(kernel_id).is_alive()
         ]
 
     @classmethod
@@ -135,11 +139,28 @@ class KernelManager(object):
         return cls.kernels[kernel_id]
 
     @classmethod
-    def start_kernel(cls, kernelspec_name, connection_name=None):
+    def start_kernel(
+        cls,
+        kernelspec_name=None,
+        connection_info=None,
+        connection_name=None,
+    ):
         """Start kernel and return a `Kernel` instance."""
-        kernel_id = cls.multi_kernel_manager.start_kernel(kernel_name=kernelspec_name)
+        kernel_id = uuid.uuid4()
+        if kernelspec_name:
+            kernel_manager = KernelManager(kernel_name=kernelspec_name)
+            kernel_manager.start_kernel()
+        elif connection_info:
+            kernel_manager = KernelManager()
+            kernel_manager.load_connection_info(connection_info)
+            # `KernelManager.kernel_name` is not automatically set from connection info.
+            kernel_manager.kernel_name = connection_info.get("kernel_name", "")
+        else:
+            raise Exception(
+                "You must specify any of {`kernelspec_name`, `connection_info`}.")
         kernel = KernelConnection(
             kernel_id,
+            kernel_manager,
             cls,
             connection_name=connection_name,
             logger=cls.logger
@@ -150,17 +171,17 @@ class KernelManager(object):
     @classmethod
     def shutdown_kernel(cls, kernel_id):
         """Shutdown kernel."""
-        cls.multi_kernel_manager.get_kernel(kernel_id).shutdown_kernel()
+        cls.get_kernel(kernel_id).shutdown_kernel()
 
     @classmethod
     def restart_kernel(cls, kernel_id):
         """Restart kernel."""
-        cls.multi_kernel_manager.get_kernel(kernel_id).shutdown_kernel(restart=True)
+        cls.get_kernel(kernel_id).shutdown_kernel(restart=True)
 
     @classmethod
     def interrupt_kernel(cls, kernel_id):
         """Interrupt kernel."""
-        cls.multi_kernel_manager.get_kernel(kernel_id).interrupt_kernel()
+        cls.get_kernel(kernel_id).interrupt_kernel()
 
 
 @chain_callbacks
@@ -171,19 +192,50 @@ def _start_kernel(
     *,
     logger=HERMES_LOGGER
 ):
-    kernelspecs = KernelManager.list_kernelspecs()
-    menu_items = list(kernelspecs.keys())
+    kernelspecs = HermesKernelManager.list_kernelspecs()
+    menu_items = list(kernelspecs.keys()) + [
+        "From connection info",
+    ]
     index = yield partial(
         window.show_quick_panel,
         menu_items)
 
     if index == -1:
         return
-    selected_kernelspec = menu_items[index]
-    connection_name = yield partial(window.show_input_panel, "connection name", "", on_change=None, on_cancel=None)
-    if connection_name == "":
-        connection_name = None
-    kernel = KernelManager.start_kernel(selected_kernelspec, connection_name=connection_name)
+    elif index == len(kernelspecs):
+        # Create a kernel from connection info.
+        connection_info_str = yield partial(
+            window.show_input_panel,
+            "Enter connection info or the path to connection file.", "", on_change=None, on_cancel=None)
+        try:
+            connection_info = json.loads(connection_info_str)
+        except ValueError:
+            try:
+                with open(connection_info_str) as infs:
+                    connection_info = json.loads(infs.read())
+            except FileNotFoundError:
+                sublime.message_dialog(
+                    'The input string was neither a valid JSON string nor a file path.')
+                return
+        connection_name = yield partial(
+            window.show_input_panel, "connection name", "", on_change=None, on_cancel=None)
+        if connection_name == "":
+            connection_name = None
+        kernel = HermesKernelManager.start_kernel(
+            connection_info=connection_info,
+            connection_name=connection_name
+        )
+    else:
+        # Create a kernel from the kernelspec name.
+        selected_kernelspec = menu_items[index]
+        connection_name = yield partial(
+            window.show_input_panel, "connection file", "", on_change=None, on_cancel=None)
+        if connection_name == "":
+            connection_name = None
+        kernel = HermesKernelManager.start_kernel(
+            kernelspec_name=selected_kernelspec,
+            connection_name=connection_name
+        )
     ViewManager.connect_kernel(
         view.buffer_id(),
         kernel.lang,
@@ -255,13 +307,13 @@ def _list_kernels(window, view, *, logger=HERMES_LOGGER):
         logger.info(log_info_msg)
     elif subcommands[index] is sc.rename:
         # Rename
-        conn = KernelManager.get_kernel(selected_kernel["id"])
+        conn = HermesKernelManager.get_kernel(selected_kernel["id"])
         curr_name = conn.connection_name if conn.connection_name is not None else ""
         new_name = yield partial(window.show_input_panel, "New name", curr_name, on_change=None, on_cancel=None)
         conn.connection_name = new_name
     elif subcommands[index] is sc.interrupt:
         # Interrupt
-        KernelManager.interrupt_kernel(
+        HermesKernelManager.interrupt_kernel(
             selected_kernel["id"])
         log_info_msg = (
             "Interrupted kernel {kernel_id}.").format(
@@ -269,7 +321,7 @@ def _list_kernels(window, view, *, logger=HERMES_LOGGER):
         logger.info(log_info_msg)
     elif subcommands[index] is sc.restart:
         # Restart
-        KernelManager.restart_kernel(
+        HermesKernelManager.restart_kernel(
             selected_kernel["id"])
         log_info_msg = (
             "Restarted kernel {kernel_id}.").format(
@@ -277,7 +329,7 @@ def _list_kernels(window, view, *, logger=HERMES_LOGGER):
         logger.info(log_info_msg)
     elif subcommands[index] is sc.shutdown:
         # Shutdown
-        KernelManager.shutdown_kernel(
+        HermesKernelManager.shutdown_kernel(
             selected_kernel["id"])
         log_info_msg = (
             "Shutdown kernel {kernel_id}.").format(
@@ -304,7 +356,7 @@ def _connect_kernel(
     continue_cb=lambda: None,
     logger=HERMES_LOGGER
 ):
-    kernel_list = KernelManager.list_kernels()
+    kernel_list = HermesKernelManager.list_kernels()
     menu_items = [
         "[{lang}] {kernel_id}".format(
             lang=kernel["name"],
@@ -365,11 +417,11 @@ def _show_kernel_selection_menu(window, view, cb, *, add_new=False):
 
     # It's better to pass the list of (connection_name, kernel_id) tuples
     # to improve the appearane of the menu.
-    kernel_list = KernelManager.list_kernels()
+    kernel_list = HermesKernelManager.list_kernels()
     menu_items = [
         "* " + repr if kernel["id"] == current_kernel_id else repr
         for repr, kernel
-        in zip(KernelManager.list_kernel_reprs(), kernel_list)
+        in zip(HermesKernelManager.list_kernel_reprs(), kernel_list)
     ]
     if add_new:
         menu_items += ["New kernel"]
@@ -395,7 +447,7 @@ def _interrupt_kernel(
 ):
     selected_kernel = yield partial(_show_kernel_selection_menu, window, view)
     if selected_kernel is not None:
-        KernelManager.interrupt_kernel(
+        HermesKernelManager.interrupt_kernel(
             selected_kernel["id"])
         log_info_msg = (
             "Interrupted kernel {kernel_id}.").format(
@@ -412,7 +464,7 @@ class HermesInterruptKernel(TextCommand):
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except KeyError:
             return False
-        return KernelManager.multi_kernel_manager.get_kernel(kernel.kernel_id).is_alive()
+        return HermesKernelManager.get_kernel(kernel.kernel_id).is_alive()
 
     def is_visible(self, *, logger=HERMES_LOGGER):
         return self.is_enabled()
@@ -432,7 +484,7 @@ def _restart_kernel(
 ):
     selected_kernel = yield partial(_show_kernel_selection_menu, window, view)
     if selected_kernel is not None:
-        KernelManager.restart_kernel(
+        HermesKernelManager.restart_kernel(
             selected_kernel["id"])
         log_info_msg = (
             "Restarted kernel {kernel_id}.").format(
@@ -449,7 +501,7 @@ class HermesRestartKernel(TextCommand):
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except KeyError:
             return False
-        return KernelManager.multi_kernel_manager.get_kernel(kernel.kernel_id).is_alive()
+        return HermesKernelManager.get_kernel(kernel.kernel_id).is_alive()
 
     def is_visible(self, *, logger=HERMES_LOGGER):
         return self.is_enabled()
@@ -469,7 +521,7 @@ def _shutdown_kernel(
 ):
     selected_kernel = yield partial(_show_kernel_selection_menu, window, view)
     if selected_kernel is not None:
-        KernelManager.shutdown_kernel(
+        HermesKernelManager.shutdown_kernel(
             selected_kernel["id"])
         log_info_msg = (
             "Shutdown kernel {kernel_id}.").format(
@@ -488,7 +540,7 @@ class HermesShutdownKernel(TextCommand):
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except KeyError:
             return False
-        return KernelManager.multi_kernel_manager.get_kernel(kernel.kernel_id).is_alive()
+        return HermesKernelManager.get_kernel(kernel.kernel_id).is_alive()
 
     def is_visible(self, *, logger=HERMES_LOGGER):
         return self.is_enabled()
@@ -582,7 +634,7 @@ class HermesExecuteBlock(TextCommand):
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except KeyError:
             return False
-        return KernelManager.multi_kernel_manager.get_kernel(kernel.kernel_id).is_alive()
+        return HermesKernelManager.get_kernel(kernel.kernel_id).is_alive()
 
     def is_visible(self, *, logger=HERMES_LOGGER):
         return self.is_enabled()
@@ -658,7 +710,7 @@ class HermesGetObjectInspection(TextCommand):
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except KeyError:
             return False
-        return KernelManager.multi_kernel_manager.get_kernel(kernel.kernel_id).is_alive()
+        return HermesKernelManager.get_kernel(kernel.kernel_id).is_alive()
 
     def is_visible(self, *, logger=HERMES_LOGGER):
         return self.is_enabled()
