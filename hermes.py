@@ -12,9 +12,6 @@ import uuid
 from functools import partial
 from logging import getLogger, INFO, StreamHandler
 
-from jupyter_client.connect import tunnel_to_kernel
-from jupyter_client.kernelspec import find_kernel_specs
-from jupyter_client.manager import KernelManager
 
 import sublime
 from sublime_plugin import (
@@ -24,7 +21,14 @@ from sublime_plugin import (
 )
 from .kernel import KernelConnection
 
-from .utils import chain_callbacks
+from .utils import add_path, chain_callbacks
+
+with add_path(os.path.join(os.path.dirname(__file__), "lib")):
+    # Import jupyter_client related functions and classes.
+    # Temporarily insert `lib` into sys.path not to affect other packages.
+    from jupyter_client.connect import tunnel_to_kernel
+    from jupyter_client.kernelspec import find_kernel_specs
+    from jupyter_client.manager import KernelManager
 
 # Logger setting
 HERMES_LOGGER = getLogger(__name__)
@@ -43,14 +47,13 @@ settings = sublime.load_settings("Hermes.sublime-settings")
 
 
 def _refresh_jupyter_path():
-    additional_jupyter_path = settings.get('jupyter_path', '')
-    if ORG_JUPYTER_PATH:
-        os.environ['JUPYTER_PATH'] = ':'.join((
-            ORG_JUPYTER_PATH,
-            additional_jupyter_path
-        ))
-    else:
-        os.environ['JUPYTER_PATH'] = additional_jupyter_path
+    additional_jupyter_path = settings.get('jupyter_path')
+    os.environ['JUPYTER_PATH'] = ':'.join([
+        path
+        for path
+        in [ORG_JUPYTER_PATH, additional_jupyter_path]
+        if path is not None
+    ])
 
 
 _refresh_jupyter_path()

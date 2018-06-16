@@ -1,8 +1,22 @@
-from functools import wraps
 import re
+import sys
+from functools import wraps
 
 import sublime
 from sublime_plugin import TextCommand
+
+
+class add_path(object):
+    """Temporarily insert a path into sys.path."""
+
+    def __init__(self, path):
+        self.path = path
+
+    def __enter__(self):
+        sys.path.insert(0, self.path)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        sys.path.remove(self.path)
 
 
 def chain_callbacks(f):
