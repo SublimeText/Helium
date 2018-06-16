@@ -42,22 +42,18 @@ if len(HERMES_LOGGER.handlers) == 0:
 # Regex patterns to extract code lines.
 INDENT_PATTERN = re.compile(r"^([ \t]*)")
 
-ORG_JUPYTER_PATH = os.environ.get('JUPYTER_PATH', '')
-settings = sublime.load_settings("Hermes.sublime-settings")
+
+ORG_JUPYTER_PATH = os.environ.get('JUPYTER_PATH')
 
 
 def _refresh_jupyter_path():
-    additional_jupyter_path = settings.get('jupyter_path')
+    additional_jupyter_path = sublime.load_settings("Hermes.sublime-settings").get('jupyter_path')
     os.environ['JUPYTER_PATH'] = ':'.join([
         path
         for path
         in [ORG_JUPYTER_PATH, additional_jupyter_path]
         if path is not None
     ])
-
-
-_refresh_jupyter_path()
-settings.add_on_change('jupyter_path', _refresh_jupyter_path)
 
 
 class ViewManager(object):
@@ -112,6 +108,7 @@ class HermesKernelManager(object):
     @classmethod
     def list_kernelspecs(cls):
         """Get the kernelspecs."""
+        _refresh_jupyter_path()
         return find_kernel_specs()
 
     @classmethod
@@ -240,7 +237,7 @@ def _start_kernel(
         # Create a kernel with SSH tunneling.
         servers = (
             sublime
-            .get_settings('Hermes.sublime-settings')
+            .load_settings('Hermes.sublime-settings')
             .get('ssh_servers')
         )
         if not servers:
