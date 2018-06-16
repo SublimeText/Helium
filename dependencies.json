@@ -5,5 +5,20 @@
 			"requests",
 			"pyzmq"
 		]
+	},
+	"windows": {
+		"*": [
+			"paramiko"
+		]
+	},
+	"osx": {
+		"*": [
+			"pexpect"
+		]
+	},
+	"linux": {
+		"*": [
+			"pexpect"
+		]
 	}
 }

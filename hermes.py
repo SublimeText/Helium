@@ -12,6 +12,7 @@ import uuid
 from functools import partial
 from logging import getLogger, INFO, StreamHandler
 
+from jupyter_client.connect import tunnel_to_kernel
 from jupyter_client.kernelspec import find_kernel_specs
 from jupyter_client.manager import KernelManager
 
@@ -43,15 +44,16 @@ settings = sublime.load_settings("Hermes.sublime-settings")
 
 def _refresh_jupyter_path():
     additional_jupyter_path = settings.get('jupyter_path', '')
-    os.environ['JUPYTER_PATH'] = ':'.join((
-        ORG_JUPYTER_PATH,
-        additional_jupyter_path
-    ))
+    if ORG_JUPYTER_PATH:
+        os.environ['JUPYTER_PATH'] = ':'.join((
+            ORG_JUPYTER_PATH,
+            additional_jupyter_path
+        ))
+    else:
+        os.environ['JUPYTER_PATH'] = additional_jupyter_path
 
 
 _refresh_jupyter_path()
-
-
 settings.add_on_change('jupyter_path', _refresh_jupyter_path)
 
 
@@ -185,6 +187,23 @@ class HermesKernelManager(object):
 
 
 @chain_callbacks
+def _enter_connection_info(window, continue_cb):
+    connection_info_str = yield partial(
+        window.show_input_panel,
+        "Enter connection info or the path to connection file.", "", on_change=None, on_cancel=None)
+    try:
+        continue_cb(json.loads(connection_info_str))
+    except ValueError:
+        try:
+            with open(connection_info_str) as infs:
+                continue_cb(json.loads(infs.read()))
+        except FileNotFoundError:
+            sublime.message_dialog(
+                'The input string was neither a valid JSON string nor a file path.')
+            raise
+
+
+@chain_callbacks
 def _start_kernel(
     window,
     view,
@@ -194,7 +213,8 @@ def _start_kernel(
 ):
     kernelspecs = HermesKernelManager.list_kernelspecs()
     menu_items = list(kernelspecs.keys()) + [
-        "From connection info",
+        "(Enter connection info)",
+        "(Connect remote kernel via SSH)"
     ]
     index = yield partial(
         window.show_quick_panel,
@@ -204,19 +224,7 @@ def _start_kernel(
         return
     elif index == len(kernelspecs):
         # Create a kernel from connection info.
-        connection_info_str = yield partial(
-            window.show_input_panel,
-            "Enter connection info or the path to connection file.", "", on_change=None, on_cancel=None)
-        try:
-            connection_info = json.loads(connection_info_str)
-        except ValueError:
-            try:
-                with open(connection_info_str) as infs:
-                    connection_info = json.loads(infs.read())
-            except FileNotFoundError:
-                sublime.message_dialog(
-                    'The input string was neither a valid JSON string nor a file path.')
-                return
+        connection_info = yield partial(_enter_connection_info, window)
         connection_name = yield partial(
             window.show_input_panel, "connection name", "", on_change=None, on_cancel=None)
         if connection_name == "":
@@ -225,11 +233,43 @@ def _start_kernel(
             connection_info=connection_info,
             connection_name=connection_name
         )
+    elif index == len(kernelspecs) + 1:
+        # Create a kernel with SSH tunneling.
+        servers = (
+            sublime
+            .get_settings('Hermes.sublime-settings')
+            .get('ssh_servers')
+        )
+        if not servers:
+            sublime.message_dialog(
+                'Please set `ssh_servers` item of the config file via `Hermes: Settings` to connect SSH servers.')
+            return
+        menu_items = list(servers.keys())
+        server_index = yield partial(
+            window.show_quick_panel,
+            menu_items)
+        server = servers[menu_items[server_index]]
+        connection_info = yield partial(_enter_connection_info, window)
+        shell_port, iopub_port, stdin_port, hb_port = tunnel_to_kernel(
+            connection_info, server['server'], server.get('key', None))
+        new_ports = {
+            'shell_port': shell_port,
+            'iopub_port': iopub_port,
+            'stdin_port': stdin_port,
+            'hb_port': hb_port,
+        }
+        connection_info.update(new_ports)
+        connection_name = yield partial(
+            window.show_input_panel, "connection name", "", on_change=None, on_cancel=None)
+        kernel = HermesKernelManager.start_kernel(
+            connection_info=connection_info,
+            connection_name=connection_name
+        )
     else:
         # Create a kernel from the kernelspec name.
         selected_kernelspec = menu_items[index]
         connection_name = yield partial(
-            window.show_input_panel, "connection file", "", on_change=None, on_cancel=None)
+            window.show_input_panel, "connection name", "", on_change=None, on_cancel=None)
         if connection_name == "":
             connection_name = None
         kernel = HermesKernelManager.start_kernel(
