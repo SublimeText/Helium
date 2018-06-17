@@ -1,23 +1,25 @@
 {
 	"*": {
 		"*": [
-			"enum",
-			"requests",
+			"dateutil",
 			"pyzmq"
 		]
 	},
 	"windows": {
 		"*": [
+			"enum",
 			"paramiko"
 		]
 	},
 	"osx": {
 		"*": [
+			"enum",
 			"pexpect"
 		]
 	},
 	"linux": {
 		"*": [
+			"enum",
 			"pexpect"
 		]
 	}
