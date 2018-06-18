@@ -21,6 +21,8 @@ import requests
 
 from .utils import chain_callbacks
 
+import bisect
+
 # Logger setting
 HERMES_LOGGER = getLogger(__name__)
 HANDLER = StreamHandler()
@@ -32,6 +34,27 @@ if len(HERMES_LOGGER.handlers) == 0:
 
 # Regex patterns to extract code lines.
 INDENT_PATTERN = re.compile(r"^([ \t]*)")
+
+# Regex pattern to find code cell blocks delimiters
+# #%%
+# # %%
+# # <codecell>
+CELL_DELIMITER_PATTERN = r"^(#\s?%%)|(# <codecell>)\s*$"
+
+# TODO: move CSS into separate file
+RUN_CELL_PHANTOM = """<body id="hermes-runCell">
+  <style>
+    .runCell {
+        text-decoration: none;
+        color: color(var(--bluish) alpha(0.33));
+        font-style: italic;
+    }
+  </style>
+  <a class='runCell' href='runCell'>Run cell</a>
+</body>
+"""
+
+RUN_CELL_PHANTOM_ID = "HermesRunCell"
 
 
 class ViewManager(object):
@@ -502,6 +525,9 @@ def _connect_kernel(
             view_name = view.file_name()
         else:
             view_name = view.name()
+
+        update_run_cell_phantoms(view)
+
         log_info_msg = (
             "Connected view '{view_name}(id: {buffer_id})'"
             "to kernel {kernel_id}.").format(
@@ -673,6 +699,57 @@ class HermesShutdownKernel(TextCommand):
         _shutdown_kernel(sublime.active_window(), self.view, logger=logger)
 
 
+class HermesRunCellManager(ViewEventListener):
+    """Manage 'Run cell' phantoms"""
+
+    def __init__(self, view):
+        self.view = view
+        self.timeout_scheduled = False
+        self.needs_update = False
+
+    def on_modified(self, *, logger=HERMES_LOGGER):
+        try:
+            ViewManager.get_kernel_for_view(self.view.buffer_id())
+        except KeyError:
+            return
+
+        # Call update_run_cell_phantoms(), but not any more than 10 times a second
+        if self.timeout_scheduled:
+            self.needs_update = True
+        else:
+            sublime.set_timeout(lambda: self.handle_timeout(), 100)
+            self.timeout_scheduled = True
+            update_run_cell_phantoms(self.view, logger=logger)
+
+    def handle_timeout(self):
+        self.timeout_scheduled = False
+        if self.needs_update:
+            self.needs_update = False
+            update_run_cell_phantoms(self.view)
+
+
+def update_run_cell_phantoms(view, *, logger=HERMES_LOGGER):
+    """Add "Run Cell" links to each code cell"""
+
+    # find all cell delimiters:
+    limits = view.find_all(CELL_DELIMITER_PATTERN)
+    # append a virtual delimiter at EOF
+    limits.append(sublime.Region(view.size(), view.size()))
+
+    # remove existing Run cell phantoms, we'll recreate all of them
+    view.erase_phantoms(RUN_CELL_PHANTOM_ID)
+
+    for i in range(len(limits) - 1):
+        code_region = sublime.Region(limits[i].end() + 1, limits[i+1].begin() - 1)
+        phantom_region = sublime.Region(limits[i].end(), limits[i].end())
+        view.add_phantom(
+            RUN_CELL_PHANTOM_ID,
+            phantom_region,
+            RUN_CELL_PHANTOM,
+            sublime.LAYOUT_INLINE,
+            on_navigate=lambda href, view=view, region=code_region: _execute_cell(view, region))
+
+
 def get_line(view: sublime.View, row: int) -> str:
     """Get the code line under the cursor."""
     point = view.text_point(row, 0)
@@ -717,11 +794,23 @@ def get_block(view: sublime.View, s: sublime.Region) -> (str, sublime.Region):
     return (view.substr(block_region), block_region)
 
 
-def get_chunk(view: sublime.View, s: sublime.Region) -> str:
-    """Get the code chunk under the cursor.
+def get_cell(view: sublime.View, region: sublime.Region, *, logger=HERMES_LOGGER) -> (str, sublime.Region):
+    """Get the code cell under the cursor.
 
-    A code chunk is a region separated by comments indicating chunks."""
-    raise NotImplementedError
+    Cells are separated by markers defined in CELL_DELIMITER_PATTERN:
+        #%%
+        # %%
+        # <codecell>
+
+    If `s` is a selected region, the code cell is it.
+    """
+    if not region.empty():
+        return (view.substr(region), region)
+    separators = view.find_all(CELL_DELIMITER_PATTERN)
+    start_point = separators[bisect.bisect(separators, region)-1].end() + 1
+    end_point = separators[bisect.bisect(separators, region)].begin() - 1
+    cell_region = sublime.Region(start_point, end_point)
+    return (view.substr(cell_region), cell_region)
 
 
 @chain_callbacks
@@ -738,7 +827,7 @@ def _execute_block(view, *, logger=HERMES_LOGGER):
 
     pre_code = []
     for s in view.sel():
-        code, region = get_block(view, s)
+        code, region = get_cell(view, s, logger=logger)
         if code == pre_code:
             continue
         kernel.execute_code(code, region)
@@ -747,6 +836,26 @@ def _execute_block(view, *, logger=HERMES_LOGGER):
             kernel_id=kernel.kernel_id)
         logger.info(log_info_msg)
         pre_code = code
+
+
+@chain_callbacks
+def _execute_cell(view, cell: sublime.Region, *, logger=HERMES_LOGGER):
+    try:
+        kernel = ViewManager.get_kernel_for_view(view.buffer_id())
+    except KeyError:
+        sublime.message_dialog("No kernel is connected to this view.")
+        yield lambda cb: _connect_kernel(
+            sublime.active_window(),
+            view,
+            continue_cb=cb)
+        kernel = ViewManager.get_kernel_for_view(view.buffer_id())
+
+    code = view.substr(cell)
+    kernel.execute_code(code, cell)
+    log_info_msg = "Executed code {code} with kernel {kernel_id}".format(
+        code=code,
+        kernel_id=kernel.kernel_id)
+    logger.info(log_info_msg)
 
 
 class HermesExecuteBlock(TextCommand):
