@@ -709,7 +709,9 @@ class HermesRunCellManager(ViewEventListener):
 
     def on_modified(self, *, logger=HERMES_LOGGER):
         try:
-            ViewManager.get_kernel_for_view(self.view.buffer_id())
+            kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
+            if not kernel.is_alive():
+                return
         except KeyError:
             return
 
