@@ -55,7 +55,7 @@ OUTPUT_VIEW_SEPARATOR = "-" * 80
 
 TEXT_PHANTOM = """<body id="hermes-result">
   <style>
-    .stdout {{ color: gray }}
+    .stdout {{ color: color(var(--foreground) alpha(0.7)) }}
     .error {{ color: var(--redish) }}
     .other {{ color: var(--yellowish) }}
     .closebutton {{ text-decoration: none }}
@@ -70,13 +70,14 @@ IMAGE_PHANTOM = """<body id="hermes-image-result">
     .closebutton {{ text-decoration: none }}
   </style>
   <a class=closebutton href=hide>×</a>
-  '<img class="image" alt="Out" src="data:image/png;base64,{data}" />
+  <br>
+  <img class="image" alt="Out" src="data:image/png;base64,{data}" />
 </body>"""
 
 STDOUT_PHANTOM = "<div class=stdout>{content}</div>"
 STDERR_PHANTOM = "<div class=error>{content}</div>"
-ERROR_PHANTOM  = "<div class=error>{content}</div>"
-OTHER_PHANTOM  = "<div class=other>{content}</div>"
+ERROR_PHANTOM = "<div class=error>{content}</div>"
+OTHER_PHANTOM = "<div class=other>{content}</div>"
 
 
 def fix_whitespace_for_phantom(text: str):
@@ -458,7 +459,11 @@ class KernelConnection(object):
         """Activate view to show the output of kernel."""
         view = self.get_view()
         current_view = sublime.active_window().active_view()
-        self.parent_view = current_view
+        self._inline_view = current_view
+        self._show_inline_output = (
+            sublime
+            .load_settings("Hermes.sublime-settings")
+            .get("inline_output"))
         sublime.active_window().focus_view(view)
         view.set_scratch(True)  # avoids prompting to save
         view.settings().set("word_wrap", "false")
@@ -492,13 +497,16 @@ class KernelConnection(object):
             phantom_html = ""
             if len(reply.stream_stdout) > 0:
                 lines += ["\n(stdout):"] + reply.stream_stdout
-                phantom_html += STDOUT_PHANTOM.format(content=fix_whitespace_for_phantom('\n'.join(reply.stream_stdout)))
+                phantom_html += STDOUT_PHANTOM.format(
+                    content=fix_whitespace_for_phantom('\n'.join(reply.stream_stdout)))
             if len(reply.stream_stderr) > 0:
                 lines += ["\n(stderr):"] + reply.stream_stderr
-                phantom_html += STDERR_PHANTOM.format(content=fix_whitespace_for_phantom('\n'.join(reply.stream_stderr)))
+                phantom_html += STDERR_PHANTOM.format(
+                    content=fix_whitespace_for_phantom('\n'.join(reply.stream_stderr)))
             if len(reply.stream_other) > 0:
                 lines += ["\n(other stream):"] + reply.stream_other
-                phantom_html += OTHER_PHANTOM.format(content=fix_whitespace_for_phantom('\n'.join(reply.stream_other)))
+                phantom_html += OTHER_PHANTOM.format(
+                    content=fix_whitespace_for_phantom('\n'.join(reply.stream_other)))
             self._write_text_to_view("\n".join(lines))
             if phantom_html:
                 self._write_inline_html_phantom(phantom_html, region)
@@ -546,34 +554,30 @@ class KernelConnection(object):
         self._logger.info("Created phantom {}".format(content))
 
     def _write_inline_html_phantom(self, content: str, region: sublime.Region):
-        if self.parent_view:
-            #region = self.parent_view.sel()[-1]
+        if self._show_inline_output:
+            # region = self._inline_view.sel()[-1]
             id = HERMES_FIGURE_PHANTOMS + datetime.now().isoformat()
             html = TEXT_PHANTOM.format(content=content)
-            self.parent_view.add_phantom(
+            self._inline_view.add_phantom(
                 id,
                 region,
                 html,
                 sublime.LAYOUT_BLOCK,
-                on_navigate=lambda href, id=id: self.parent_view.erase_phantoms(id))
+                on_navigate=lambda href, id=id: self._inline_view.erase_phantoms(id))
             self._logger.info("Created inline phantom {}".format(html))
-        else:
-            self._logger.error("Parent view not set, can't create html phantom")
 
     def _write_inline_image_phantom(self, data: str, region: sublime.Region):
-        if self.parent_view:
-            #region = self.parent_view.sel()[-1]
+        if self._show_inline_output:
+            # region = self._inline_view.sel()[-1]
             id = HERMES_FIGURE_PHANTOMS + datetime.now().isoformat()
             html = IMAGE_PHANTOM.format(data=data)
-            self.parent_view.add_phantom(
+            self._inline_view.add_phantom(
                 id,
                 region,
                 html,
                 sublime.LAYOUT_BLOCK,
-                on_navigate=lambda href, id=id: self.parent_view.erase_phantoms(id))
+                on_navigate=lambda href, id=id: self._inline_view.erase_phantoms(id))
             self._logger.info("Created inline phantom image")
-        else:
-            self._logger.error("Parent view not set, can't create phantom image")
 
     def _write_mime_data_to_view(self, mime_data: dict, region: sublime.Region) -> None:
         self.activate_view()

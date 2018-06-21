@@ -1,6 +1,7 @@
 {
   "complete": true,  // Whether use Hermes' autocomplete powered by Jupyter kernel.
   "complete_timeout": 0.5, // Timeout to get completion (in seconds).
+  "inline_output": false, // Set to true to show output in current view, like Jupyter
   "connections": [
     // The list of connections.
     // Example of connection setting:
