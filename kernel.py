@@ -128,6 +128,7 @@ class KernelConnection(object):
         def run(self):
             """Main routine."""
             # TODO: log
+            # TODO: remove view and regions from id2region
             while not self.exit.is_set():
                 try:
                     msg = self._kernel.client.get_shell_msg(timeout=1)
@@ -155,7 +156,7 @@ class KernelConnection(object):
                     content = msg.get("content", dict())
                     execution_count = content.get("execution_count", None)
                     msg_type = msg['msg_type']
-                    region = self._kernel.id2region[msg['parent_header']['msg_id']]
+                    view, region = self._kernel.id2region[msg['parent_header']['msg_id']]
                     if msg_type == MSG_TYPE_STATUS:
                         self._kernel._execution_state = content['execution_state']
                     elif msg_type == MSG_TYPE_EXECUTE_INPUT:
@@ -168,17 +169,19 @@ class KernelConnection(object):
                             content["ename"],
                             content["evalue"],
                             content["traceback"],
-                            region
+                            region,
+                            view,
                         )
                     elif msg_type == MSG_TYPE_DISPLAY_DATA:
-                        self._kernel._write_mime_data_to_view(content["data"], region)
+                        self._kernel._write_mime_data_to_view(content["data"], region, view)
                     elif msg_type == MSG_TYPE_EXECUTE_RESULT:
-                        self._kernel._write_mime_data_to_view(content["data"], region)
+                        self._kernel._write_mime_data_to_view(content["data"], region, view)
                     elif msg_type == MSG_TYPE_STREAM:
                         self._kernel._handle_stream(
                             content["name"],
                             content["text"],
                             region,
+                            view,
                         )
                 except Empty:
                     pass
@@ -312,15 +315,16 @@ class KernelConnection(object):
     def execution_state(self):
         return self._execution_state
 
+    @property
+    def _show_inline_output(self):
+        return (sublime
+                .load_settings("Hermes.sublime-settings")
+                .get("inline_output"))
+
     def activate_view(self):
         """Activate view to show the output of kernel."""
         view = self.get_view()
         current_view = sublime.active_window().active_view()
-        self._inline_view = current_view
-        self._show_inline_output = (
-            sublime
-            .load_settings("Hermes.sublime-settings")
-            .get("inline_output"))
         sublime.active_window().focus_view(view)
         view.set_scratch(True)  # avoids prompting to save
         view.settings().set("word_wrap", "false")
@@ -332,7 +336,15 @@ class KernelConnection(object):
             code=code)
         self._write_text_to_view(line)
 
-    def _handle_error(self, execution_count, ename, evalue, traceback, region: sublime.Region) -> None:
+    def _handle_error(
+        self,
+        execution_count,
+        ename,
+        evalue,
+        traceback,
+        region: sublime.Region,
+        view: sublime.View
+    ) -> None:
         try:
             lines = "\nError[{execution_count}]: {ename}, {evalue}.\nTraceback:\n{traceback}".format(
                 execution_count=execution_count,
@@ -341,20 +353,23 @@ class KernelConnection(object):
                 traceback="\n".join(traceback))
             lines = remove_ansi_escape(lines)
             self._write_text_to_view(lines)
-            phantom_html = ERROR_PHANTOM.format(content=fix_whitespace_for_phantom(lines))
-            self._write_inline_html_phantom(phantom_html, region)
+            phantom_html = STREAM_PHANTOM.format(
+                name='error',
+                content=fix_whitespace_for_phantom(lines)
+            )
+            self._write_inline_html_phantom(phantom_html, region, view)
         except AttributeError:
             # Just there is no error.
             pass
 
-    def _handle_stream(self, name, text, region: sublime.Region) -> None:
+    def _handle_stream(self, name, text, region: sublime.Region, view: sublime.View) -> None:
         # Currently don't consider real time catching of streams.
         try:
             lines = "\n({name}):\n{text}".format(name=name, text=text)
             phantom_html = STREAM_PHANTOM.format(name=name, content=fix_whitespace_for_phantom(text))
             self._write_text_to_view(lines)
             if phantom_html:
-                self._write_inline_html_phantom(phantom_html, region)
+                self._write_inline_html_phantom(phantom_html, region, view)
         except AttributeError:
             # Just there is no error.
             pass
@@ -363,6 +378,8 @@ class KernelConnection(object):
         self._write_text_to_view("\nOut[{}]: ".format(execution_count))
 
     def _write_text_to_view(self, text: str) -> None:
+        if self._show_inline_output:
+            return
         self.activate_view()
         view = self.get_view()
         view.set_read_only(False)
@@ -373,6 +390,9 @@ class KernelConnection(object):
         view.show(view.size())
 
     def _write_phantom(self, content: str):
+        if self._show_inline_output:
+            return
+        self.activate_view()
         file_size = self.get_view().size()
         region = sublime.Region(file_size, file_size)
         self.get_view().add_phantom(
@@ -382,34 +402,33 @@ class KernelConnection(object):
             sublime.LAYOUT_BLOCK)
         self._logger.info("Created phantom {}".format(content))
 
-    def _write_inline_html_phantom(self, content: str, region: sublime.Region):
+    def _write_inline_html_phantom(self, content: str, region: sublime.Region, view: sublime.View):
         if self._show_inline_output:
             # region = self._inline_view.sel()[-1]
             id = HERMES_FIGURE_PHANTOMS + datetime.now().isoformat()
             html = TEXT_PHANTOM.format(content=content)
-            self._inline_view.add_phantom(
+            view.add_phantom(
                 id,
                 region,
                 html,
                 sublime.LAYOUT_BLOCK,
-                on_navigate=lambda href, id=id: self._inline_view.erase_phantoms(id))
+                on_navigate=lambda href, id=id: view.erase_phantoms(id))
             self._logger.info("Created inline phantom {}".format(html))
 
-    def _write_inline_image_phantom(self, data: str, region: sublime.Region):
+    def _write_inline_image_phantom(self, data: str, region: sublime.Region, view: sublime.View):
         if self._show_inline_output:
             # region = self._inline_view.sel()[-1]
             id = HERMES_FIGURE_PHANTOMS + datetime.now().isoformat()
             html = IMAGE_PHANTOM.format(data=data)
-            self._inline_view.add_phantom(
+            view.add_phantom(
                 id,
                 region,
                 html,
                 sublime.LAYOUT_BLOCK,
-                on_navigate=lambda href, id=id: self._inline_view.erase_phantoms(id))
+                on_navigate=lambda href, id=id: view.erase_phantoms(id))
             self._logger.info("Created inline phantom image")
 
-    def _write_mime_data_to_view(self, mime_data: dict, region: sublime.Region) -> None:
-        self.activate_view()
+    def _write_mime_data_to_view(self, mime_data: dict, region: sublime.Region, view: sublime.View) -> None:
         if "text/plain" in mime_data:
             # Some kernel (such as IRkernel) sends text in display_data.
             result = mime_data["text/plain"]
@@ -436,7 +455,7 @@ class KernelConnection(object):
                 data=data,
                 bgcolor="white")
             self._write_phantom(content)
-            self._write_inline_image_phantom(data, region)
+            self._write_inline_image_phantom(data, region, view)
 
     def _handle_inspect_reply(self, reply: dict):
         window = sublime.active_window()
@@ -468,10 +487,10 @@ class KernelConnection(object):
             view.set_name(view_name)
             return view
 
-    def execute_code(self, code, phantom_region):
+    def execute_code(self, code, phantom_region, view):
         """Run code with Jupyter kernel."""
         msg_id = self.client.execute(code)
-        self.id2region[msg_id] = sublime.Region(phantom_region.end(), phantom_region.end())
+        self.id2region[msg_id] = view, sublime.Region(phantom_region.end(), phantom_region.end())
         info_message = "Kernel executed code ```{code}```.".format(code=code)
         self._logger.info(info_message)
 

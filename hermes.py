@@ -75,7 +75,12 @@ class ViewManager(object):
         """Connect view to kernel."""
         kernel = HermesKernelManager.get_kernel(kernel_id)
         cls.view_kernel_table[buffer_id] = kernel
-        kernel.activate_view()
+        inline_output = (
+            sublime
+            .load_settings("Hermes.sublime-settings")
+            .get("inline_output"))
+        if not inline_output:
+            kernel.activate_view()
 
     @classmethod
     def remove_view(cls, buffer_id):
@@ -658,7 +663,7 @@ def _execute_block(view, *, logger=HERMES_LOGGER):
         code, region = get_block(view, s)
         if code == pre_code:
             continue
-        kernel.execute_code(code, region)
+        kernel.execute_code(code, region, view)
         log_info_msg = "Executed code {code} with kernel {kernel_id}".format(
             code=code,
             kernel_id=kernel.kernel_id)
