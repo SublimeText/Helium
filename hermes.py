@@ -809,8 +809,9 @@ def get_cell(view: sublime.View, region: sublime.Region, *, logger=HERMES_LOGGER
     if not region.empty():
         return (view.substr(region), region)
     separators = view.find_all(CELL_DELIMITER_PATTERN)
-    start_point = separators[bisect.bisect(separators, region)-1].end() + 1
-    end_point = separators[bisect.bisect(separators, region)].begin() - 1
+    r = sublime.Region(region.begin()+1, region.begin()+1)
+    start_point = separators[bisect.bisect(separators, r)-1].end() + 1
+    end_point = separators[bisect.bisect(separators, r)].begin() - 1
     cell_region = sublime.Region(start_point, end_point)
     return (view.substr(cell_region), cell_region)
 
@@ -829,7 +830,7 @@ def _execute_block(view, *, logger=HERMES_LOGGER):
 
     pre_code = []
     for s in view.sel():
-        code, region = get_cell(view, s, logger=logger)
+        code, region = get_block(view, s)
         if code == pre_code:
             continue
         kernel.execute_code(code, region)
@@ -841,7 +842,7 @@ def _execute_block(view, *, logger=HERMES_LOGGER):
 
 
 @chain_callbacks
-def _execute_cell(view, cell: sublime.Region, *, logger=HERMES_LOGGER):
+def _execute_cell(view, region: sublime.Region, *, logger=HERMES_LOGGER):
     try:
         kernel = ViewManager.get_kernel_for_view(view.buffer_id())
     except KeyError:
@@ -852,7 +853,7 @@ def _execute_cell(view, cell: sublime.Region, *, logger=HERMES_LOGGER):
             continue_cb=cb)
         kernel = ViewManager.get_kernel_for_view(view.buffer_id())
 
-    code = view.substr(cell)
+    code, cell = get_cell(view, region, logger=logger)
     kernel.execute_code(code, cell)
     log_info_msg = "Executed code {code} with kernel {kernel_id}".format(
         code=code,
@@ -876,6 +877,35 @@ class HermesExecuteBlock(TextCommand):
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
         _execute_block(self.view, logger=logger)
+
+
+class HermesExecuteCell(TextCommand):
+    """Execute code cell."""
+
+    def is_enabled(self, *, logger=HERMES_LOGGER):
+        try:
+            kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
+        except KeyError:
+            return False
+        return kernel.is_alive()
+
+    def is_visible(self, *, logger=HERMES_LOGGER):
+        return self.is_enabled()
+
+    def run(self, edit, move_cursor=False, *, logger=HERMES_LOGGER):
+        """Command definition.
+        If move_cursor is true, move the cursor to the next cell after execution.
+        """
+        for s in self.view.sel():
+            _execute_cell(self.view, s, logger=logger)
+
+        if move_cursor:
+            _, cell = get_cell(self.view, self.view.sel()[-1], logger=logger)
+            pt = sublime.Region(cell.end()+1, cell.end()+1)
+            self.view.sel().clear()
+            self.view.sel().add(pt)
+            # TODO: scroll to cursor after phantoms after Jupyter callback rather than fixed time
+            sublime.set_timeout(lambda: self.view.show(pt), 500)
 
 
 class StatusBar(object):
