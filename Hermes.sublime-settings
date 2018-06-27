@@ -8,10 +8,15 @@
     /*
      * {
      *   "name": "localhost",             // The name of connection shown in the quick panel.
-     *   "url": "http://localhost:8888",  // The URL to access Jupyter notebook.  
+     *   "url": "http://localhost:8888",  // The URL to access Jupyter notebook.
      *   "token": "..."                   // Authorization token. If this is not set, you will be asked when setting URL.
      * }
     */
   ],
   "username": "" // You can set username in header of messages to kernels.
+
+  // If you use kernels located in the directory other than default search path
+  // (see http://jupyter-client.readthedocs.io/en/stable/kernels.html#kernel-specs),
+  // set their path as below.
+  // "jupyter_path": "/path/to/kernel"
 }

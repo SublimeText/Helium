@@ -20,10 +20,6 @@
     "command": "hermes_interrupt_kernel"
   },
   {
-    "caption": "Hermes: Connect Server",
-    "command": "hermes_connect_server"
-  },
-  {
     "caption": "Hermes: Execute Block",
     "command": "hermes_execute_block"
   },

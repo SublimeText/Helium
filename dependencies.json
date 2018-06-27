@@ -1,0 +1,31 @@
+{
+	"windows": {
+		"*": [
+			"dateutil",
+			"enum",
+			"paramiko",
+			"python-six",
+			"pyzmq"
+		]
+	},
+	"osx": {
+		"*": [
+			"dateutil",
+			"enum",
+			"pexpect",
+			"ptyprocess",
+			"python-six",
+			"pyzmq"
+		]
+	},
+	"linux": {
+		"*": [
+			"dateutil",
+			"enum",
+			"pexpect",
+			"ptyprocess",
+			"python-six",
+			"pyzmq"
+		]
+	}
+}

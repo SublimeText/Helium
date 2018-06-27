@@ -56,22 +56,21 @@ You can install it with Package Control plugin, run `Package Control: Install Pa
 Usage
 -----------------
 
-  0. (Outside of the editor) Start Jupyter notebook server. Create a SSH tunnel to that if necessary.
-  1. Connect to the server by `Hermes: Connect Server` command (whose command name is `hermes_connect_server`). Input the address of the Jupyter server and the token of the running process. You can write them in the preference.
-  2. Connect to kernel.
-
-    - If no kernel is running, start a kernel by `Hermes: Start Kernel` (whose command name is `hermes_start_kernel`)
-    - If kernel exists, correspond the view to the kernel by `Hermes: Connect Kernel` (whose command name is `hermes_connect_kernel`)
-    - You will be required to input 
-
-  3. Play with Jupyter kernels. Commands below are shown only when the active view is connected to a Jupyter kernel.
+  1. Start or connect to the kernel by `Hermes: Connect Kernel` command (whose command name is `hermes_connect_kernel`).
+  2. Play with Jupyter kernels. Commands below are shown only when the active view is connected to a Jupyter kernel.
 
     - Execute code by `Hermes: Execute Block` (whose command name is `hermes_execute_block`).
     - Get Object Inspection by `Hermes: Get Object Inspection` (whose command name is `hermes_get_object_inspection`).
     - You should be able to get autocomplete from the kernel from the time you connected. If you don't want autocomplete, set `"complete"` as `false` in setting file.
     - You can restart, shutdown, and interrupt process via `Hermes: Restart Kernel`, `Hermes: Shutdown Kernel`, `Hermes: Interrupt Kernel` commands.
 
-  4. You can manipulate kernels by `Hermes: List Kernels` command.
+  3. You can manipulate kernels by `Hermes: List Kernels` command.
+
+
+Using Python kernel installed via Conda
+----------------------------------
+
+Python kernel installed via Conda is not found by Jupyter by default. You should add the path to kernel into the `jupyter_path` entry of the config file.
 
 
 TODOs

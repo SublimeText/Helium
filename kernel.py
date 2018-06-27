@@ -2,19 +2,14 @@
 
 KernelConnection class provides interaction with Jupyter kernels.
 
-Copyright (c) 2017, NEGORO Tetsuya (https://github.com/ngr-t)
+Copyright (c) 2017-2018, NEGORO Tetsuya (https://github.com/ngr-t)
 """
-
-from threading import Thread
-from queue import Queue
-from urllib.parse import quote
-import json
-from uuid import uuid4
-from datetime import datetime
 import re
+from collections import defaultdict
+from datetime import datetime
+from threading import Event, Thread, RLock
+from queue import Empty, Queue
 
-import requests
-import websocket
 import sublime
 
 from .utils import (
@@ -28,6 +23,7 @@ REPLY_STATUS_OK = "ok"
 REPLY_STATUS_ERROR = "error"
 REPLY_STATUS_ABORT = "abort"
 
+MSG_TYPE_EXECUTE_INPUT = 'execute_input'
 MSG_TYPE_EXECUTE_REQUEST = 'execute_request'
 MSG_TYPE_EXECUTE_RESULT = 'execute_result'
 MSG_TYPE_EXECUTE_REPLY = 'execute_reply'
@@ -64,7 +60,7 @@ TEXT_PHANTOM = """<body id="hermes-result">
   {content}
 </body>"""
 
-IMAGE_PHANTOM = """<body id="hermes-image-result">
+IMAGE_PHANTOM = """<body id="hermes-image-result" style="background-color:white">
   <style>
     .image {{ background-color: white }}
     .closebutton {{ text-decoration: none }}
@@ -74,10 +70,7 @@ IMAGE_PHANTOM = """<body id="hermes-image-result">
   <img class="image" alt="Out" src="data:image/png;base64,{data}" />
 </body>"""
 
-STDOUT_PHANTOM = "<div class=stdout>{content}</div>"
-STDERR_PHANTOM = "<div class=error>{content}</div>"
-ERROR_PHANTOM = "<div class=error>{content}</div>"
-OTHER_PHANTOM = "<div class=other>{content}</div>"
+STREAM_PHANTOM = "<div class={name}>{content}</div>"
 
 
 def fix_whitespace_for_phantom(text: str):
@@ -115,177 +108,167 @@ def extract_data(result):
         return ""
 
 
-class JupyterReply(object):
-    """Parse replies from Jupyter."""
-
-    def __init__(self, messages, message_type="execute", *, logger=None):
-        """Parse message and initialize self."""
-        self._display_data = []
-        self._stream_stdout = []
-        self._stream_stderr = []
-        self._stream_other = []
-        for message in messages:
-            logger.info(message)
-            content = message.get("content", dict())
-            if "execution_count" in content:
-                self._execution_count = content["execution_count"]
-            msg_type = get_msg_type(message)
-            # switch by msg_type.
-            if msg_type.endswith("_reply"):
-                self._status = content["status"]
-            if msg_type == MSG_TYPE_COMPLETE_REPLY:
-                self._matches = content["matches"]
-            elif msg_type == MSG_TYPE_INSPECT_REPLY:
-                found = content["found"]
-                if found:
-                    self._inspect_data = content["data"]
-                else:
-                    self._inspect_data = "No object inspection found."
-            elif msg_type == MSG_TYPE_ERROR:
-                self._ename = content["ename"]
-                self._evalue = content["evalue"]
-                self._traceback = content["traceback"]
-            elif msg_type == MSG_TYPE_DISPLAY_DATA:
-                self._display_data.append(content["data"])
-            elif msg_type == MSG_TYPE_EXECUTE_RESULT:
-                self._execute_result = content["data"]
-            elif msg_type == MSG_TYPE_STREAM:
-                if content["name"] == "stdout":
-                    self._stream_stdout.append(content["text"])
-                elif content["name"] == "stderr":
-                    self._stream_stderr.append(content["text"])
-                else:
-                    self._stream_other.append(content["text"])
-            elif msg_type == MSG_TYPE_STATUS:
-                self._execution_state = content["execution_state"]
-
-    @property
-    def status(self):
-        return self._status
-
-    @property
-    def ename(self):
-        return self._ename
-
-    @property
-    def evalue(self):
-        return self._evalue
-
-    @property
-    def traceback(self):
-        return self._traceback
-
-    @property
-    def execution_count(self):
-        return self._execution_count
-
-    @property
-    def display_data(self):
-        try:
-            return self._display_data
-        except AttributeError:
-            return [dict()]
-
-    @property
-    def execute_result(self):
-        try:
-            return self._execute_result
-        except AttributeError:
-            return dict()
-
-    @property
-    def stream_stdout(self):
-        return self._stream_stdout
-
-    @property
-    def stream_stderr(self):
-        return self._stream_stderr
-
-    @property
-    def stream_other(self):
-        return self._stream_other
-
-    @property
-    def matches(self):
-        return self._matches
-
-    @property
-    def inspect_data(self):
-        return self._inspect_data
-
-
 class KernelConnection(object):
     """Interact with a Jupyter kernel."""
 
-    class AsyncCommunicator(Thread):
-        """Communicator that runs  asynchroniously."""
+    class MessageReceiver(Thread):
 
         def __init__(self, kernel):
             """Initialize AsyncCommunicator class."""
-            super(KernelConnection.AsyncCommunicator, self).__init__()
+            super().__init__()
             self._kernel = kernel
-            self.message_queue = Queue()
+            self.exit = Event()
+
+        def shutdown(self):
+            self.exit.set()
+
+    class ShellMessageReceiver(MessageReceiver):
+        """Communicator that runs asynchroniously."""
 
         def run(self):
             """Main routine."""
             # TODO: log
-            while True:
+            # TODO: remove view and regions from id2region
+            while not self.exit.is_set():
                 try:
-                    message, callback = self.message_queue.get()
-                    reply = self._kernel._communicate(message)
-                    callback(reply)
-                except Exception as err:
-                    print(err)
+                    msg = self._kernel.client.get_shell_msg(timeout=1)
+                    self._kernel.shell_msg_queues_lock.acquire()
+                    try:
+                        queue = self._kernel.shell_msg_queues[msg['parent_header']['msg_id']]
+                    finally:
+                        self._kernel.shell_msg_queues_lock.release()
+                    queue.put(msg)
+                except Empty:
+                    pass
+                except Exception as ex:
+                    self._kernel._logger.exception(ex)
+
+    class IOPubMessageReceiver(MessageReceiver):
+        """Receive and process IOPub messages."""
+
+        def run(self):
+            """Main routine."""
+            # TODO: log, handle other message types.
+            while not self.exit.is_set():
+                try:
+                    msg = self._kernel.client.get_iopub_msg(timeout=1)
+                    self._kernel._logger.info(msg)
+                    content = msg.get("content", dict())
+                    execution_count = content.get("execution_count", None)
+                    msg_type = msg['msg_type']
+                    view, region = self._kernel.id2region[msg['parent_header']['msg_id']]
+                    if msg_type == MSG_TYPE_STATUS:
+                        self._kernel._execution_state = content['execution_state']
+                    elif msg_type == MSG_TYPE_EXECUTE_INPUT:
+                        self._kernel._write_text_to_view("\n\n")
+                        self._kernel._output_input_code(content['code'], content['execution_count'])
+                    elif msg_type == MSG_TYPE_ERROR:
+                        self._kernel._logger.info("Handling error")
+                        self._kernel._handle_error(
+                            execution_count,
+                            content["ename"],
+                            content["evalue"],
+                            content["traceback"],
+                            region,
+                            view,
+                        )
+                    elif msg_type == MSG_TYPE_DISPLAY_DATA:
+                        self._kernel._write_mime_data_to_view(content["data"], region, view)
+                    elif msg_type == MSG_TYPE_EXECUTE_RESULT:
+                        self._kernel._write_mime_data_to_view(content["data"], region, view)
+                    elif msg_type == MSG_TYPE_STREAM:
+                        self._kernel._handle_stream(
+                            content["name"],
+                            content["text"],
+                            region,
+                            view,
+                        )
+                except Empty:
+                    pass
+                except Exception as ex:
+                    self._kernel._logger.exception(ex)
+
+    class StdInMessageReceiver(MessageReceiver):
+        """Receive and process IOPub messages."""
+
+        def _handle_input_request(self, prompt, password):
+            def interrupt():
+                self.parent.interrupt_kernel(self.kernel_id)
+
+            if password:
+                show_password_input(prompt, self._kernel.input, interrupt)
+            else:
+                (sublime
+                 .active_window()
+                 .show_input_panel(
+                     prompt,
+                     "",
+                     self._kernel.client.input,
+                     lambda x: None,
+                     interrupt
+                 ))
+
+        def run(self):
+            """Main routine."""
+            # TODO: log, handle other message types.
+            while not self.exit.is_set():
+                try:
+                    msg = self._kernel.client.get_stdin_msg(timeout=1)
+                    msg_type = msg['msg_type']
+                    content = msg['content']
+                    if msg_type == MSG_TYPE_INPUT_REQUEST:
+                        self._handle_input_request(content["prompt"], content["password"])
+                except Empty:
+                    pass
+                except Exception as ex:
+                    self._kernel._logger.exception(ex)
+
+    def _init_receivers(self):
+        # Set the attributes refered by receivers before they start.
+        self._shell_msg_receiver = self.ShellMessageReceiver(self)
+        self._shell_msg_receiver.start()
+        self._iopub_msg_receiver = self.IOPubMessageReceiver(self)
+        self._iopub_msg_receiver.start()
+        self._stdin_msg_receiver = self.StdInMessageReceiver(self)
+        self._stdin_msg_receiver.start()
 
     def __init__(
         self,
-        lang,
         kernel_id,
-        manager,
-        username=None,
-        auth_type=("no_auth", "password", "token")[0],
-        *,
-        auth_info=None,
-        token=None,
+        kernel_manager,
+        parent,
+        connection_name=None,
         logger=None,
-        connection_name=None
     ):
         """Initialize KernelConnection class.
 
         paramters
         ---------
         kernel_id str: kernel ID
-        manager parent kernel manager
+        parent parent kernel manager
         """
-        self._lang = lang
-        self._kernel_id = kernel_id
-        self.manager = manager
-        self._session = uuid4().hex
-        self._http_url = '{base_url}/api/kernels/{kernel_id}'.format(
-            base_url=manager.base_url(),
-            kernel_id=quote(kernel_id))
-        self._ws_url = '{base_ws_url}/api/kernels/{kernel_id}/channels?session_id={session_id}'.format(
-            base_ws_url=manager.base_ws_url(),
-            kernel_id=quote(kernel_id),
-            session_id=quote(self._session))
-        self._async_communicator = KernelConnection.AsyncCommunicator(self)
-        self._async_communicator.start()
         self._logger = logger
-        self._auth_type = auth_type
-        self._auth_info = auth_info
-        self._token = token
-        self._execution_state = 'unknown'
+        self.shell_msg_queues = defaultdict(Queue)
+        self._kernel_id = kernel_id
+        self.parent = parent
+        self.kernel_manager = kernel_manager
+        self.client = self.kernel_manager.client()
+        self.client.start_channels()
+        self.shell_msg_queues_lock = RLock()
+        self.id2region = {}
         self._connection_name = connection_name
-        if username is None:
-            self._username = (
-                sublime
-                .load_settings("Hermes.sublime-settings")
-                .get("username", ""))
+        self._execution_state = 'unknown'
+        self._init_receivers()
+
+    def __del__(self):
+        self._shell_msg_receiver.shutdown()
+        self._iopub_msg_receiver.shutdown()
+        self._stdin_msg_receiver.shutdown()
 
     @property
     def lang(self):
         """Language of kernel."""
-        return self._lang
+        return self.kernel_manager.kernel_name
 
     @property
     def kernel_id(self):
@@ -328,142 +311,20 @@ class KernelConnection(object):
                 lang=self.lang,
                 kernel_id=self.kernel_id)
 
-    def _ping(self) -> bool:
-        try:
-            self.sock.ping()
-            frame = self.sock.recv_frame()
-            if frame.opcode == websocket.ABNF.OPCODE_PONG:
-                return True
-            return False
-        except Exception as ex:
-            return False
+    @property
+    def execution_state(self):
+        return self._execution_state
 
-    def _establish_ws_connection(self, connect_kwargs: dict=dict()) -> None:
-        # Send ping and check if connection is alive.
-        if self._ping():
-            return
-        else:
-            self.sock = None
-        try:
-            response = self.manager.get_request(self._http_url)
-            if response['id'] != self.kernel_id:
-                return
-        except requests.RequestException:
-            return
-        if self._auth_type == "no_auth":
-            sock = websocket.create_connection(
-                self._ws_url,
-                **connect_kwargs)
-        elif self._auth_type == "password":
-            sock = websocket.create_connection(
-                self._ws_url,
-                http_proxy_auth=self._auth_info,
-                **connect_kwargs)
-        elif self._auth_type == "token":
-            header_auth_body = "token {token}".format(
-                token=self._token)
-            header = dict(Authorization=header_auth_body)
-            sock = websocket.create_connection(
-                self._ws_url,
-                header=header)
-        self.sock = sock
-        if not self._ping():
-            # Connection can't be established (ex. when the kernel is dead)
-            # Should we show some message in this case,
-            # and let users to make a new connection?
-            self.sock = None
-
-    def _communicate(self, message, timeout=None) -> JupyterReply:
-        """Send `message` to the kernel and return `reply` for it."""
-        # Use `create_connection`'s default value unless `timeout` is set.
-        if timeout is not None:
-            connect_kwargs = dict(timeout=timeout)
-        else:
-            connect_kwargs = dict()
-        self._establish_ws_connection(connect_kwargs)
-        if self.sock is None:
-            return None
-        self.sock.send(json.dumps(message).encode())
-        replies = []
-        replied = False
-        while True:
-            # The code here requires refactoring.
-            # The code to interpret reply messages is devided into here and `JupyterReply` class.
-            # Maybe it's better choice to remove `JupyterReply` class and
-            # let all message interpretation processed here.
-            reply = json.loads(self.sock.recv())
-            replies.append(reply)
-            self._logger.info(reply)
-            msg_type = get_msg_type(reply)
-            if msg_type.endswith("_reply"):
-                # Kernel sends status first, or XX_reply first?
-                if self._execution_state == 'idle':
-                    break
-                replied = True
-            if msg_type == MSG_TYPE_STATUS:
-                self._execution_state = reply["content"]["execution_state"]
-                if self._execution_state == 'idle' and replied:
-                    break
-            elif msg_type == MSG_TYPE_INPUT_REQUEST:
-                content = reply["content"]
-
-                def send_input(value):
-                    input_reply = dict(
-                        header=self._gen_header(MSG_TYPE_INPUT_REPLY),
-                        parent_header=reply["header"],
-                        content=dict(value=value),
-                        channel='stdin',
-                        metadata={},
-                        buffers={})
-                    self.sock.send(json.dumps(input_reply).encode())
-
-                prompt = content["prompt"]
-
-                def interrupt():
-                    self.manager.interrupt_kernel(self.kernel_id)
-
-                if content["password"]:
-                    show_password_input(prompt, send_input, interrupt)
-
-                else:
-                    (
-                        sublime
-                        .active_window()
-                        .show_input_panel(
-                            prompt,
-                            "",
-                            send_input,
-                            lambda x: None,
-                            interrupt
-                        )
-                    )
-
-        reply_obj = JupyterReply(replies, logger=self._logger)
-        return reply_obj
-
-    def _async_communicate(self, message, callback):
-        self._async_communicator.message_queue.put((message, callback))
-
-    def _gen_header(self, msg_type):
-        return dict(
-            version=JUPYTER_PROTOCOL_VERSION,
-            kernel_id=self.kernel_id,
-            msg_id=uuid4().hex,
-            datetime=datetime.now().isoformat(),
-            msg_type=msg_type,
-            username=self._username,
-            session=self._session
-        )
+    @property
+    def _show_inline_output(self):
+        return (sublime
+                .load_settings("Hermes.sublime-settings")
+                .get("inline_output"))
 
     def activate_view(self):
         """Activate view to show the output of kernel."""
         view = self.get_view()
         current_view = sublime.active_window().active_view()
-        self._inline_view = current_view
-        self._show_inline_output = (
-            sublime
-            .load_settings("Hermes.sublime-settings")
-            .get("inline_output"))
         sublime.active_window().focus_view(view)
         view.set_scratch(True)  # avoids prompting to save
         view.settings().set("word_wrap", "false")
@@ -475,65 +336,50 @@ class KernelConnection(object):
             code=code)
         self._write_text_to_view(line)
 
-    def _handle_error(self, reply: JupyterReply, region: sublime.Region) -> None:
+    def _handle_error(
+        self,
+        execution_count,
+        ename,
+        evalue,
+        traceback,
+        region: sublime.Region,
+        view: sublime.View
+    ) -> None:
         try:
             lines = "\nError[{execution_count}]: {ename}, {evalue}.\nTraceback:\n{traceback}".format(
-                execution_count=reply.execution_count,
-                ename=reply.ename,
-                evalue=reply.evalue,
-                traceback="\n".join(reply.traceback))
+                execution_count=execution_count,
+                ename=ename,
+                evalue=evalue,
+                traceback="\n".join(traceback))
             lines = remove_ansi_escape(lines)
             self._write_text_to_view(lines)
-            phantom_html = ERROR_PHANTOM.format(content=fix_whitespace_for_phantom(lines))
-            self._write_inline_html_phantom(phantom_html, region)
+            phantom_html = STREAM_PHANTOM.format(
+                name='error',
+                content=fix_whitespace_for_phantom(lines)
+            )
+            self._write_inline_html_phantom(phantom_html, region, view)
         except AttributeError:
             # Just there is no error.
             pass
 
-    def _handle_stream(self, reply: JupyterReply, region: sublime.Region) -> None:
+    def _handle_stream(self, name, text, region: sublime.Region, view: sublime.View) -> None:
         # Currently don't consider real time catching of streams.
         try:
-            lines = []
-            phantom_html = ""
-            if len(reply.stream_stdout) > 0:
-                lines += ["\n(stdout):"] + reply.stream_stdout
-                phantom_html += STDOUT_PHANTOM.format(
-                    content=fix_whitespace_for_phantom('\n'.join(reply.stream_stdout)))
-            if len(reply.stream_stderr) > 0:
-                lines += ["\n(stderr):"] + reply.stream_stderr
-                phantom_html += STDERR_PHANTOM.format(
-                    content=fix_whitespace_for_phantom('\n'.join(reply.stream_stderr)))
-            if len(reply.stream_other) > 0:
-                lines += ["\n(other stream):"] + reply.stream_other
-                phantom_html += OTHER_PHANTOM.format(
-                    content=fix_whitespace_for_phantom('\n'.join(reply.stream_other)))
-            self._write_text_to_view("\n".join(lines))
+            lines = "\n({name}):\n{text}".format(name=name, text=text)
+            phantom_html = STREAM_PHANTOM.format(name=name, content=fix_whitespace_for_phantom(text))
+            self._write_text_to_view(lines)
             if phantom_html:
-                self._write_inline_html_phantom(phantom_html, region)
+                self._write_inline_html_phantom(phantom_html, region, view)
         except AttributeError:
             # Just there is no error.
             pass
 
-    def _handle_inspect_reply(self, reply: JupyterReply):
-        window = sublime.active_window()
-        if window.find_output_panel(HERMES_OBJECT_INSPECT_PANEL) is not None:
-            window.destroy_output_panel(HERMES_OBJECT_INSPECT_PANEL)
-        view = window.create_output_panel(HERMES_OBJECT_INSPECT_PANEL)
-        try:
-            text = remove_ansi_escape(reply.inspect_data["text/plain"])
-            view.run_command(
-                'append',
-                {'characters': text})
-            window.run_command(
-                'show_panel',
-                dict(panel="output." + HERMES_OBJECT_INSPECT_PANEL))
-        except KeyError:
-            pass
-
-    def _write_out_execution_count(self, reply: JupyterReply) -> None:
-        self._write_text_to_view("\nOut[{}]: ".format(reply.execution_count))
+    def _write_out_execution_count(self, execution_count) -> None:
+        self._write_text_to_view("\nOut[{}]: ".format(execution_count))
 
     def _write_text_to_view(self, text: str) -> None:
+        if self._show_inline_output:
+            return
         self.activate_view()
         view = self.get_view()
         view.set_read_only(False)
@@ -544,6 +390,9 @@ class KernelConnection(object):
         view.show(view.size())
 
     def _write_phantom(self, content: str):
+        if self._show_inline_output:
+            return
+        self.activate_view()
         file_size = self.get_view().size()
         region = sublime.Region(file_size, file_size)
         self.get_view().add_phantom(
@@ -553,34 +402,33 @@ class KernelConnection(object):
             sublime.LAYOUT_BLOCK)
         self._logger.info("Created phantom {}".format(content))
 
-    def _write_inline_html_phantom(self, content: str, region: sublime.Region):
+    def _write_inline_html_phantom(self, content: str, region: sublime.Region, view: sublime.View):
         if self._show_inline_output:
             # region = self._inline_view.sel()[-1]
             id = HERMES_FIGURE_PHANTOMS + datetime.now().isoformat()
             html = TEXT_PHANTOM.format(content=content)
-            self._inline_view.add_phantom(
+            view.add_phantom(
                 id,
                 region,
                 html,
                 sublime.LAYOUT_BLOCK,
-                on_navigate=lambda href, id=id: self._inline_view.erase_phantoms(id))
+                on_navigate=lambda href, id=id: view.erase_phantoms(id))
             self._logger.info("Created inline phantom {}".format(html))
 
-    def _write_inline_image_phantom(self, data: str, region: sublime.Region):
+    def _write_inline_image_phantom(self, data: str, region: sublime.Region, view: sublime.View):
         if self._show_inline_output:
             # region = self._inline_view.sel()[-1]
             id = HERMES_FIGURE_PHANTOMS + datetime.now().isoformat()
             html = IMAGE_PHANTOM.format(data=data)
-            self._inline_view.add_phantom(
+            view.add_phantom(
                 id,
                 region,
                 html,
                 sublime.LAYOUT_BLOCK,
-                on_navigate=lambda href, id=id: self._inline_view.erase_phantoms(id))
+                on_navigate=lambda href, id=id: view.erase_phantoms(id))
             self._logger.info("Created inline phantom image")
 
-    def _write_mime_data_to_view(self, mime_data: dict, region: sublime.Region) -> None:
-        self.activate_view()
+    def _write_mime_data_to_view(self, mime_data: dict, region: sublime.Region, view: sublime.View) -> None:
         if "text/plain" in mime_data:
             # Some kernel (such as IRkernel) sends text in display_data.
             result = mime_data["text/plain"]
@@ -607,10 +455,24 @@ class KernelConnection(object):
                 data=data,
                 bgcolor="white")
             self._write_phantom(content)
-            self._write_inline_image_phantom(data, region)
+            self._write_inline_image_phantom(data, region, view)
 
-    def update_status_bar(self):
-        self._communicate()
+    def _handle_inspect_reply(self, reply: dict):
+        window = sublime.active_window()
+        if window.find_output_panel(HERMES_OBJECT_INSPECT_PANEL) is not None:
+            window.destroy_output_panel(HERMES_OBJECT_INSPECT_PANEL)
+        view = window.create_output_panel(HERMES_OBJECT_INSPECT_PANEL)
+        try:
+            self._logger.debug(reply)
+            text = remove_ansi_escape(reply["text/plain"])
+            view.run_command(
+                'append',
+                {'characters': text})
+            window.run_command(
+                'show_panel',
+                dict(panel="output." + HERMES_OBJECT_INSPECT_PANEL))
+        except KeyError as ex:
+            self._logger.exception(ex)
 
     def get_view(self):
         """Get view corresponds to the KernelConnection."""
@@ -625,100 +487,77 @@ class KernelConnection(object):
             view.set_name(view_name)
             return view
 
-    def execute_code(self, code, phantom_region):
+    def execute_code(self, code, phantom_region, view):
         """Run code with Jupyter kernel."""
-
-        # fix for sublime bug where phantoms are displayed after the first line in a multiline region
-        phantom_region = sublime.Region(phantom_region.end(), phantom_region.end())
-
-        def callback(reply):
-            try:
-                self._output_input_code(code, reply.execution_count)
-                self._write_out_execution_count(reply)
-                self._handle_stream(reply, region=phantom_region)
-                for mime_data in reply.display_data:
-                    self._write_mime_data_to_view(mime_data, region=phantom_region)
-                self._write_mime_data_to_view(reply.execute_result, region=phantom_region)
-                self._handle_error(reply, region=phantom_region)
-            finally:
-                # Separator should be written if an undealt error occur while handling reply.
-                self._write_text_to_view("\n\n" + OUTPUT_VIEW_SEPARATOR + "\n\n")
-
-        header = self._gen_header(MSG_TYPE_EXECUTE_REQUEST)
-        content = dict(
-            code=code,
-            silent=False,
-            store_history=True,
-            user_expressions={},
-            allow_stdin=True)
-        message = dict(
-            header=header,
-            parent_header={},
-            channel='shell',
-            content=content,
-            metadata={},
-            buffers={})
-        self._async_communicate(message, callback)
+        msg_id = self.client.execute(code)
+        self.id2region[msg_id] = view, sublime.Region(phantom_region.end(), phantom_region.end())
         info_message = "Kernel executed code ```{code}```.".format(code=code)
         self._logger.info(info_message)
 
     def is_alive(self):
         """Return True if kernel is alive."""
-        try:
-            self._establish_ws_connection()
-            if self.sock is not None:
-                return True
-            else:
-                self._execution_state = 'dead'
-                return False
-        except websocket.WebSocketException:
-            # Now we consider the kernel dead if we can't connect via WebSocket.
-            # There should be several case that kernel is not dead but we can't connect,
-            # i.e. temporary bad condition of network. Should we distinguish these cases?
-            self._execution_state = 'dead'
-            return False
-
-    @property
-    def execution_state(self):
-        return self._execution_state
+        return self.client.hb_channel.is_beating()
 
     def get_complete(self, code, cursor_pos, timeout=None):
         """Generate complete request."""
-        header = self._gen_header(MSG_TYPE_COMPLETE_REQUEST)
-        content = dict(
-            code=code,
-            cursor_pos=cursor_pos,
-            silent=False,
-            store_history=True,
-            user_expressions={},
-            allow_stdin=False)
-        message = dict(
-            header=header,
-            parent_header={},
-            channel='shell',
-            content=content,
-            metadata={},
-            buffers={})
-        reply = self._communicate(message, timeout)
-        return reply.matches
+        msg_id = self.client.complete(code, cursor_pos)
+        self.shell_msg_queues_lock.acquire()
+        try:
+            queue = self.shell_msg_queues[msg_id]
+        finally:
+            self.shell_msg_queues_lock.release()
+
+        try:
+            recv_msg = queue.get(timeout=timeout)
+            recv_content = recv_msg['content']
+            self._logger.info(recv_content)
+            if '_jupyter_types_experimental' in recv_content.get('metadata', {}):
+                # If the reply has typing metadata, use it.
+                # This metadata for typing is obviously experimental
+                # and not documented yet.
+                return [
+                    (match['text'] + '\t' + match['type'], match['text'])
+                    for match
+                    in recv_content['metadata']['_jupyter_types_experimental']
+                ]
+            else:
+                # Just say the completion is came from this plugin, otherwise.
+                return [
+                    (match + '\tHermes', match)
+                    for match
+                    in recv_content['matches']
+                ]
+        except Empty:
+            self._logger.info("Completion timeout.")
+        except Exception as ex:
+            self._logger.exception(ex)
+        finally:
+            self.shell_msg_queues_lock.acquire()
+            try:
+                self.shell_msg_queues.pop(msg_id, None)
+            finally:
+                self.shell_msg_queues_lock.release()
+
+        return []
 
     def get_inspection(self, code, cursor_pos, detail_level=0, timeout=None):
         """Get object inspection by sending a `inspect_request` message to kernel."""
-        header = self._gen_header(MSG_TYPE_INSPECT_REQUEST)
-        content = dict(
-            code=code,
-            cursor_pos=cursor_pos,
-            detail_level=detail_level,
-            silent=False,
-            store_history=False,
-            user_expressions={},
-            allow_stdin=False)
-        message = dict(
-            header=header,
-            parent_header={},
-            channel='shell',
-            content=content,
-            metadata={},
-            buffers={})
-        reply = self._communicate(message, timeout)
-        self._handle_inspect_reply(reply)
+        msg_id = self.client.inspect(code, cursor_pos, detail_level)
+        self.shell_msg_queues_lock.acquire()
+        try:
+            queue = self.shell_msg_queues[msg_id]
+        finally:
+            self.shell_msg_queues_lock.release()
+
+        try:
+            recv_msg = queue.get(timeout=timeout)
+            self._handle_inspect_reply(recv_msg['content']['data'])
+        except Empty:
+            self._logger.info("Object inspection timeout.")
+
+        finally:
+            self.shell_msg_queues_lock.acquire()
+            try:
+                self.shell_msg_queues.pop(msg_id, None)
+            finally:
+                self.shell_msg_queues_lock.release()
