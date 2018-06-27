@@ -5,7 +5,7 @@
 			"enum",
 			"paramiko",
 			"python-six",
-			"zmq"
+			"pyzmq"
 		]
 	},
 	"osx": {
@@ -15,7 +15,7 @@
 			"pexpect",
 			"ptyprocess",
 			"python-six",
-			"zmq"
+			"pyzmq"
 		]
 	},
 	"linux": {
@@ -25,7 +25,7 @@
 			"pexpect",
 			"ptyprocess",
 			"python-six",
-			"zmq"
+			"pyzmq"
 		]
 	}
 }
