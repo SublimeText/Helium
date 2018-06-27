@@ -1,14 +1,17 @@
-Hermes package is licensed under the Modified BSD License
-
-  - Copyright (c) 2016-, NEGORO Tetsuya
+Hermes package is licensed under GNU GENERAL PUBLIC LICENSE Version 2.
+YEAR: 2016-2018
+COPYRIGHT HOLDER: NEGORO Tetsuya
 
 This package includes libraries below.
 
   - ipython_genutils
-  - jupyter_client
   - jupyter_core
   - traitlets
   - decorator
+
+This package includes a modified version of library below.
+
+  - jupyter_client
 
 ipython_genutils is licensed under the terms of the Modified BSD License (also known as New or Revised or 3-Clause BSD), as follows:
 
