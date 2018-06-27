@@ -24,6 +24,17 @@
     "command": "hermes_execute_block"
   },
   {
+    "caption": "Hermes: Execute Cell",
+    "command": "hermes_execute_cell"
+  },
+  {
+    "caption": "Hermes: Execute Cell and Move",
+    "command": "hermes_execute_cell", "args":
+    {
+      "move_cursor": "True"
+    }
+  },
+  {
     "caption": "Hermes: List Kernels",
     "command": "hermes_list_kernels"
   },
