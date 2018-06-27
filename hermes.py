@@ -5,6 +5,7 @@ The package provides code execution and completion in interaction with Jupyter.
 Copyright (c) 2016-2018, NEGORO Tetsuya (https://github.com/ngr-t)
 """
 
+import bisect
 import json
 import os
 import re
@@ -30,7 +31,6 @@ with add_path(os.path.join(os.path.dirname(__file__), "lib")):
     from jupyter_client.kernelspec import find_kernel_specs
     from jupyter_client.manager import KernelManager
 
-import bisect
 
 # Logger setting
 HERMES_LOGGER = getLogger(__name__)
@@ -776,7 +776,7 @@ def _execute_cell(view, region: sublime.Region, *, logger=HERMES_LOGGER):
         kernel = ViewManager.get_kernel_for_view(view.buffer_id())
 
     code, cell = get_cell(view, region, logger=logger)
-    kernel.execute_code(code, cell)
+    kernel.execute_code(code, cell, view)
     log_info_msg = "Executed code {code} with kernel {kernel_id}".format(
         code=code,
         kernel_id=kernel.kernel_id)
