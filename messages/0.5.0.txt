@@ -4,9 +4,9 @@ Update in 0.5.0
 This is update with large changes. Please read this release note.
 The way to make connection with Jupyter kernels is changed. Now you don't need to run Jupyter notebook externally. Just run `Hermes: connect kernel` command.
 If you want to connect to existing kernels, get connect info of the kernel (see [http://jupyter-notebook.readthedocs.io/en/stable/examples/Notebook/Connecting%20with%20the%20Qt%20Console.html]), and choose "(Enter connection info)". Also you can setup SSH tunneling.
-This change is a consequence of internal changes on implementation to fix hangup issues. I think it's more convenient for those who works locally running Jupyter, but might not for those who works on remote. I ask you for your kind understanding about changes.
+This change is a consequence of internal changes on implementation to fix hangup issues. I'm afraid that this change might break the workflow of some users,but I think it's more convenient for many people who works locally running Jupyter. I ask you for your kind understanding about changes.
 
 Thanks to @SamiPirbay, there are also new features, which are inline phantom mode and cell evaluation support.
 
   - You can get evaluation result as inline phantoms by setting the `inline_output` option `True`.
-  - Regions surrounded by `# %%` or `# <codecell>` are considered as "code cells". You can execute the resion by `Hermes: Execute cell` or `Hermes: Execute Cell and Move` command.
+  - Regions surrounded by `# %%` or `# <codecell>` (you can configure it in `cell_delimiter_pattern` option item) are considered as "code cells". You can execute the resion by `Hermes: Execute cell` or `Hermes: Execute Cell and Move` command.
