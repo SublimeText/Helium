@@ -497,13 +497,26 @@ class KernelConnection(object):
         """Get view corresponds to the KernelConnection."""
         view = None
         view_name = self.view_name
-        views = sublime.active_window().views()
+        window = sublime.active_window()
+        views = window.views()
         for view_candidate in views:
             if view_candidate.name() == view_name:
                 return view_candidate
         if not view:
-            view = sublime.active_window().new_file()
+            active_group = window.active_group()
+            view = window.new_file()
             view.set_name(view_name)
+            num_group = window.num_groups()
+            if num_group != 1:
+                if active_group + 1 < num_group:
+                    new_group = active_group + 1
+                else:
+                    new_group = active_group - 1
+                window.set_view_index(
+                    view,
+                    new_group,
+                    len(window.sheets_in_group(new_group))
+                )
             return view
 
     def execute_code(self, code, phantom_region, view):
