@@ -156,7 +156,10 @@ class KernelConnection(object):
                     content = msg.get("content", dict())
                     execution_count = content.get("execution_count", None)
                     msg_type = msg['msg_type']
-                    view, region = self._kernel.id2region[msg['parent_header']['msg_id']]
+                    view, region = self._kernel.id2region.get(
+                        msg['parent_header']['msg_id'],
+                        (None, None)
+                    )
                     if msg_type == MSG_TYPE_STATUS:
                         self._kernel._execution_state = content['execution_state']
                     elif msg_type == MSG_TYPE_EXECUTE_INPUT:
@@ -351,8 +354,8 @@ class KernelConnection(object):
         ename,
         evalue,
         traceback,
-        region: sublime.Region,
-        view: sublime.View
+        region: sublime.Region = None,
+        view: sublime.View = None
     ) -> None:
         try:
             lines = "\nError[{execution_count}]: {ename}, {evalue}.\nTraceback:\n{traceback}".format(
@@ -362,22 +365,29 @@ class KernelConnection(object):
                 traceback="\n".join(traceback))
             lines = remove_ansi_escape(lines)
             self._write_text_to_view(lines)
-            phantom_html = STREAM_PHANTOM.format(
-                name='error',
-                content=fix_whitespace_for_phantom(lines)
-            )
-            self._write_inline_html_phantom(phantom_html, region, view)
+            if region is not None:
+                phantom_html = STREAM_PHANTOM.format(
+                    name='error',
+                    content=fix_whitespace_for_phantom(lines)
+                )
+                self._write_inline_html_phantom(phantom_html, region, view)
         except AttributeError:
             # Just there is no error.
             pass
 
-    def _handle_stream(self, name, text, region: sublime.Region, view: sublime.View) -> None:
+    def _handle_stream(
+        self,
+        name,
+        text,
+        region: sublime.Region = None,
+        view: sublime.View = None
+    ) -> None:
         # Currently don't consider real time catching of streams.
         try:
             lines = "\n({name}):\n{text}".format(name=name, text=text)
             phantom_html = STREAM_PHANTOM.format(name=name, content=fix_whitespace_for_phantom(text))
             self._write_text_to_view(lines)
-            if phantom_html:
+            if phantom_html and (region is not None):
                 self._write_inline_html_phantom(phantom_html, region, view)
         except AttributeError:
             # Just there is no error.
@@ -509,6 +519,8 @@ class KernelConnection(object):
 
     def get_complete(self, code, cursor_pos, timeout=None):
         """Generate complete request."""
+        if self.execution_state != 'idle':
+            return []
         msg_id = self.client.complete(code, cursor_pos)
         self.shell_msg_queues_lock.acquire()
         try:
@@ -525,7 +537,8 @@ class KernelConnection(object):
                 # This metadata for typing is obviously experimental
                 # and not documented yet.
                 return [
-                    (match['text'] + '\t' + match['type'], match['text'])
+                    (match['text'] + '\t' + ('<no type info>' if match['type'] is None else match['type']),
+                     match['text'])
                     for match
                     in recv_content['metadata']['_jupyter_types_experimental']
                 ]
