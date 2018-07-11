@@ -44,11 +44,6 @@ if len(HERMES_LOGGER.handlers) == 0:
 # Regex patterns to extract code lines.
 INDENT_PATTERN = re.compile(r"^([ \t]*)")
 
-# Regex pattern to find code cell blocks delimiters
-# #%%
-# # %%
-# # <codecell>
-CELL_DELIMITER_PATTERN = r"^(#\s?%%)|(# <codecell>)\s*$"
 
 # TODO: move CSS into separate file
 RUN_CELL_PHANTOM = """<body id="hermes-runCell">
@@ -656,7 +651,13 @@ def update_run_cell_phantoms(view, *, logger=HERMES_LOGGER):
     """Add "Run Cell" links to each code cell"""
 
     # find all cell delimiters:
-    limits = view.find_all(CELL_DELIMITER_PATTERN)
+
+    cell_delimiter_pattern = (
+        sublime
+        .load_settings("Hermes.sublime-settings")
+        .get("cell_delimiter_pattern")
+    )
+    limits = view.find_all(cell_delimiter_pattern)
     # append a virtual delimiter at EOF
     limits.append(sublime.Region(view.size(), view.size()))
 
@@ -721,16 +722,18 @@ def get_block(view: sublime.View, s: sublime.Region) -> (str, sublime.Region):
 def get_cell(view: sublime.View, region: sublime.Region, *, logger=HERMES_LOGGER) -> (str, sublime.Region):
     """Get the code cell under the cursor.
 
-    Cells are separated by markers defined in CELL_DELIMITER_PATTERN:
-        #%%
-        # %%
-        # <codecell>
+    Cells are separated by markers defined in `cell_delimiter_pattern` in the config file.
 
     If `s` is a selected region, the code cell is it.
     """
     if not region.empty():
         return (view.substr(region), region)
-    separators = view.find_all(CELL_DELIMITER_PATTERN)
+    cell_delimiter_pattern = (
+        sublime
+        .load_settings("Hermes.sublime-settings")
+        .get("cell_delimiter_pattern")
+    )
+    separators = view.find_all(cell_delimiter_pattern)
     r = sublime.Region(region.begin()+1, region.begin()+1)
     start_point = separators[bisect.bisect(separators, r)-1].end() + 1
     end_point = separators[bisect.bisect(separators, r)].begin() - 1
