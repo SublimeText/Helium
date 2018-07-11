@@ -279,7 +279,7 @@ class KernelConnection(object):
         self.kernel_manager.shutdown_kernel()
 
     def restart_kernel(self):
-        self.kernel_manager.shutdown_kernel(restart=True)
+        self.kernel_manager.restart_kernel()
 
     def interrupt_kernel(self):
         self.kernel_manager.interrupt_kernel()
