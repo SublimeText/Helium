@@ -193,7 +193,7 @@ class KernelConnection(object):
 
         def _handle_input_request(self, prompt, password):
             def interrupt():
-                self.parent.interrupt_kernel(self.kernel_id)
+                self._kernel.interrupt_kernel(self.kernel_id)
 
             if password:
                 show_password_input(prompt, self._kernel.input, interrupt)
@@ -274,6 +274,15 @@ class KernelConnection(object):
     def kernel_id(self):
         """ID of kernel."""
         return self._kernel_id
+
+    def shutdown_kernel(self):
+        self.kernel_manager.shutdown_kernel()
+
+    def restart_kernel(self):
+        self.kernel_manager.restart_kernel()
+
+    def interrupt_kernel(self):
+        self.kernel_manager.interrupt_kernel()
 
     def get_connection_name(self):
         return self._connection_name

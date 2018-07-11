@@ -206,7 +206,7 @@ class HermesKernelManager(object):
     @classmethod
     def restart_kernel(cls, kernel_id):
         """Restart kernel."""
-        cls.get_kernel(kernel_id).shutdown_kernel(restart=True)
+        cls.get_kernel(kernel_id).restart_kernel()
 
     @classmethod
     def interrupt_kernel(cls, kernel_id):
