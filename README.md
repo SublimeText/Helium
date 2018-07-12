@@ -8,76 +8,89 @@ Any feedback is highly welcome. I hope this package will help your life with ST3
 
 ![Introduction image](raw/images/README/intro.png)
 
-Features
----------------
 
-  - Connect to Jupyter gateway and start / interrupt / shutdown / restart kernels.
-  - Connect to running Jupyter processes through HTTP.
-
-    + The plugin can deal authorization by token.
-
-  - Execute code block in view and get the result within ST3.
-
-    + The executed code blocks are:
-
-      * If there are selected regions, execute them.
-      * If not, the adjacent lines with no empty line and not less indented than the line which includes the cursor are considered as the code block.
-
-    + A view to store inputs and results is created for each kernel.
-    + Figures with "image/png" type and passed as a "display_data" message can be shown within result view.
-
-  - Autocomplete is provided by the kernel.
-  - Get object inspection from the kernel.
-
-
-Why using Jupyter?
------------------
-
-We can execute code, retrieve results including images, get completions and object inspections by the Jupyter protocol regardless of the interpreter implementation of languages if it has Jupyter kernel.
-If we try to do that by directly running interpreters there should be several interpreter-specific problems, but we can entrust the kernel maintainers on language-specific problems by using Jupyter. 
-
-
-Why not using Jupyter Notebook?
------------------
-
-I admit Jupyter Notebook is a powerful tool for instantly sharing small analysis work, exploring data or APIs, or making executable tutorials. Yes, I often use it, too.
-However, in my opinion, it is not suited for projects with large code bases.
-I want to jumpt across files instantly, make modules organized (not saved as `.ipynb`s), kick scripts with various parameters, and make project code more reusable and reproducible... but still I want to edit them with interactive feedback.
-
-
-Installation
------------------
+## Installation
 
 Now this package is under the package control channel!
 
 You can install it with Package Control plugin, run `Package Control: Install Package`, then choose `Hermes` from the package list.
 
 
-Usage
------------------
-
-  1. Start or connect to the kernel by `Hermes: Connect Kernel` command (whose command name is `hermes_connect_kernel`).
-  2. Play with Jupyter kernels. Commands below are shown only when the active view is connected to a Jupyter kernel.
-
-    - Execute code by `Hermes: Execute Block` (whose command name is `hermes_execute_block`).
-    - Get Object Inspection by `Hermes: Get Object Inspection` (whose command name is `hermes_get_object_inspection`).
-    - You should be able to get autocomplete from the kernel from the time you connected. If you don't want autocomplete, set `"complete"` as `false` in setting file.
-    - You can restart, shutdown, and interrupt process via `Hermes: Restart Kernel`, `Hermes: Shutdown Kernel`, `Hermes: Interrupt Kernel` commands.
-
-  3. You can manipulate kernels by `Hermes: List Kernels` command.
+## Usage
 
 
-Using Python kernel installed via Conda
-----------------------------------
+### Connecting to Jupyter kernels
+
+#### 1. The most basic way, start a kernelspec installed locally, as a subprocess of ST3 (the process stops when Sublime stops)
+
+  1. Run `Hermes: connect kernel` command.
+  2. Choose `New kernel`.
+  3. Choose the kernelspec you want to run.
+
+
+#### 2. Connect to the kernel already runnning and connected to Hermes
+
+  1. Run `Hermes: connect kernel` command.
+  2. Choose the kernel you want to connect.
+
+#### 3. Connect to a kernel already running under some other Jupyter app (such as Notebook)
+
+  1. Get connection info of the kernel. The way to get connection info differ among kernels, see the doc of each kernel (in ipython kernel, you can get it by `%connect_info` magic.)
+  2. Run `Hermes: connect kernel` command.
+  3. Choose `New kernel`.
+  4. Choose `(Enter connection info)`.
+  5. Enter the connection info (Hermes accepts a path or connection info itself).
+
+#### 4. Connect to a kernel already running under some other Jupyter app, in a SSH server
+
+  1. Configure SSH servers in the setting file (opened by `Hermes: Settings` command.)
+  2. Get connection info of the kernel. The way to get connection info differ among kernels, see the doc of each kernel (in ipython kernel, you can get it by `%connect_info` magic.)
+  3. Run `Hermes: connect kernel` command.
+  4. Choose `New kernel`.
+  5. Choose `(Connect remote kernel via SSH)`.
+  6. Choose the server, then enter the connection info.
+
+
+#### Using Python kernel installed via Conda
 
 Python kernel installed via Conda is not found by Jupyter by default. You should add the path to kernel into the `jupyter_path` entry of the config file.
 
+### Execution
 
-TODOs
------------------
+Execute code by `Hermes: Execute Block` (whose command name is `hermes_execute_block`).
 
-  - [ ] Moving cursor on execution.
-  - [ ] Rearrange log messages. Make option to set logging level.
-  - [ ] Implement output as inline Phantom like LightTable or Hydrogen.
-  - [ ] Password authentication.
+#### Code cell
 
+Regions surrounded by `# %%` or `# <codecell>` (you can configure it in `cell_delimiter_pattern` option item) are considered as "code cells".
+
+You can execute a region by `Hermes: Execute cell` (`hermes_execute_cell`) or `Hermes: Execute Cell and Move` command.
+Each cell has a clickable "Run Cell" phantom that appears next to the cell markers to run the cell.
+
+### Object inspection
+
+Get Object Inspection by `Hermes: Get Object Inspection` (whose command name is `hermes_get_object_inspection`).
+
+### Autocomplete
+
+You should be able to get autocomplete from the kernel from the time you connected. If you don't want autocomplete, set `"complete"` as `false` in setting file.
+
+### Other kernel manipulations
+
+You can restart, shutdown, and interrupt process via `Hermes: Restart Kernel`, `Hermes: Shutdown Kernel`, `Hermes: Interrupt Kernel` commands.
+
+You can also run these command as a submenu of `Hermes: List Kernels` command.
+
+
+## Motivation of development
+
+### Why using Jupyter?
+
+We can execute code, retrieve results including images, get completions and object inspections by the Jupyter protocol regardless of the interpreter implementation of languages if it has Jupyter kernel.
+If we try to do that by directly running interpreters there should be several interpreter-specific problems, but we can entrust the kernel maintainers on language-specific problems by using Jupyter. 
+
+
+### Why not using Jupyter Notebook?
+
+I admit Jupyter Notebook is a powerful tool for instantly sharing small analysis work, exploring data or APIs, or making executable tutorials. Yes, I often use it, too.
+However, in my opinion, it is not suited for projects with large code bases.
+I want to jumpt across files instantly, make modules organized (not saved as `.ipynb`s), kick scripts with various parameters, and make project code more reusable and reproducible... but still I want to edit them with interactive feedback.
