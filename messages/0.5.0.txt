@@ -1,0 +1,58 @@
+Update in 0.5.0
+---------------
+
+This is update with big changes. Please read this release note.
+I had tackled with the known serious unstability issues, and large modification was required to solve it. Consequently it requires changes about the way to Jupyter kernel.
+The way to make connection with Jupyter kernels is changed as below.
+
+
+### 1. The most basic way, start a kernelspec installed locally, as a subprocess of ST3 (the process stops when Sublime stops)
+
+  1. Run `Hermes: connect kernel` command.
+  2. Choose `New kernel`.
+  3. Choose the kernelspec you want to run.
+
+
+### 2. Connect to the kernel already runnning and connected to Hermes
+
+  1. Run `Hermes: connect kernel` command.
+  2. Choose the kernel you want to connect.
+
+### 3. Connect to a kernel already running under some other Jupyter app (such as Notebook)
+
+  1. Get connection info of the kernel. The way to get connection info differ among kernels, see the doc of each kernel (in ipython kernel, you can get it by `%connect_info` magic.)
+  2. Run `Hermes: connect kernel` command.
+  3. Choose `New kernel`.
+  4. Choose `(Enter connection info)`.
+  5. Enter the connection info (Hermes accepts a path or connection info itself).
+
+### 4. Connect to a kernel already running under some other Jupyter app, in a SSH server
+
+  1. Configure SSH servers in the setting file (opened by `Hermes: Settings` command.)
+  2. Get connection info of the kernel. The way to get connection info differ among kernels, see the doc of each kernel (in ipython kernel, you can get it by `%connect_info` magic.)
+  3. Run `Hermes: connect kernel` command.
+  4. Choose `New kernel`.
+  5. Choose `(Connect remote kernel via SSH)`.
+  6. Choose the server, then enter the connection info.
+
+
+I'm afraid that this change might break the workflow of some users, but I think it's more convenient for many people who works with locally running Jupyter. I ask you for your kind understanding about the changes.
+
+
+## New features
+
+Thanks to @SamiPirbay, there are also new cool features, which are inline phantom mode and cell evaluation support.
+
+
+### Inline phantoms
+
+You can get evaluation result as inline phantoms in the place where you executed code like Light Table or Hydrogen.
+It's enabled by setting the `inline_output` option `True`. Each phantom has a small x mark to close it.
+
+
+### Cell evaluation support
+
+Regions surrounded by `# %%` or `# <codecell>` (you can configure it in `cell_delimiter_pattern` option item) are considered as "code cells".
+
+You can execute a region by `Hermes: Execute cell` or `Hermes: Execute Cell and Move` command.
+Each cell has a clickable "Run Cell" phantom that appears next to the cell markers to run the cell.
