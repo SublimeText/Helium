@@ -1,0 +1,4 @@
+Update in 0.5.1
+---------------
+
+Fixed that text data in display_data were not shown as inline output. This has caused problem such as no execution results shown when we use IRkernel (#46).
