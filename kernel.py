@@ -157,7 +157,7 @@ class KernelConnection(object):
                     execution_count = content.get("execution_count", None)
                     msg_type = msg['msg_type']
                     view, region = self._kernel.id2region.get(
-                        msg['parent_header']['msg_id'],
+                        msg['parent_header'].get('msg_id', None),
                         (None, None)
                     )
                     if msg_type == MSG_TYPE_STATUS:
@@ -448,21 +448,23 @@ class KernelConnection(object):
             self._logger.info("Created inline phantom image")
 
     def _write_mime_data_to_view(self, mime_data: dict, region: sublime.Region, view: sublime.View) -> None:
-        if "text/plain" in mime_data:
-            # Some kernel (such as IRkernel) sends text in display_data.
-            result = mime_data["text/plain"]
-            lines = "\n(display data): {result}".format(result=result)
+        # Now we use basically text/plain for text type.
+        # Jupyter kernels often emits html whom minihtml cannot render.
+        if 'text/plain' in mime_data:
+            content = mime_data["text/plain"]
+            lines = "\n(display data): {content}".format(content=content)
             self._write_text_to_view(lines)
-        elif "text/markdown" in mime_data:
-            # Some kernel (such as IRkernel) sends text in display_data.
-            result = mime_data["text/markdown"]
-            lines = "\n(display data): {result}".format(result=result)
-            self._write_text_to_view(lines)
-        elif "text/html" in mime_data:
-            # Some kernel (such as IRkernel) sends text in display_data.
+            self._write_inline_html_phantom(
+                fix_whitespace_for_phantom(content),
+                region,
+                view
+            )
+        elif 'text/html' in mime_data:
             self._logger.info("Caught 'text/html' output without plain text. Try to show with phantom.")
             content = mime_data["text/html"]
             self._write_phantom(content)
+            self._write_inline_html_phantom(content, region, view)
+
         if "image/png" in mime_data:
             data = mime_data["image/png"].strip()
             self._logger.info("Caught image.")
