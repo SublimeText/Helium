@@ -18,7 +18,8 @@ import sublime
 from sublime_plugin import (
     TextCommand,
     EventListener,
-    ViewEventListener
+    ViewEventListener,
+    WindowCommand
 )
 from .kernel import KernelConnection
 
@@ -786,7 +787,15 @@ def _execute_cell(view, region: sublime.Region, *, logger=HERMES_LOGGER):
     logger.info(log_info_msg)
 
 
-class HermesExecuteBlock(TextCommand):
+class HermesExecuteBlock(WindowCommand):
+    """Execute code as build."""
+    def run(self):
+        view = sublime.active_window().active_view()
+        text_command = HermesExecuteBlockText(view)
+        text_command.run(edit=None)
+
+
+class HermesExecuteBlockText(TextCommand):
     """Execute code."""
 
     def is_enabled(self, *, logger=HERMES_LOGGER):
