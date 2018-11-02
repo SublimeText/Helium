@@ -1,4 +1,0 @@
-{
-    "selector": "source.python",
-    "target": "hermes_execute_block"
-}

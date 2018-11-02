@@ -787,16 +787,16 @@ def _execute_cell(view, region: sublime.Region, *, logger=HERMES_LOGGER):
     logger.info(log_info_msg)
 
 
-class HermesExecuteBlock(WindowCommand):
-    """Execute code as build."""
-    def run(self):
+class HermesExecuteBlockBuild(WindowCommand):
+    """Execute code block as build."""
+    def run(self, *, logger=HERMES_LOGGER):
         view = sublime.active_window().active_view()
-        text_command = HermesExecuteBlockText(view)
-        text_command.run(edit=None)
+        text_command = HermesExecuteBlock(view)
+        text_command.run(edit=None, logger=logger)
 
 
-class HermesExecuteBlockText(TextCommand):
-    """Execute code."""
+class HermesExecuteBlock(TextCommand):
+    """Execute code block."""
 
     def is_enabled(self, *, logger=HERMES_LOGGER):
         try:
@@ -811,6 +811,14 @@ class HermesExecuteBlockText(TextCommand):
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
         _execute_block(self.view, logger=logger)
+
+
+class HermesExecuteCellBuild(WindowCommand):
+    """Execute code cell as build."""
+    def run(self, *, logger=HERMES_LOGGER):
+        view = sublime.active_window().active_view()
+        text_command = HermesExecuteCell(view)
+        text_command.run(edit=None, logger=logger)
 
 
 class HermesExecuteCell(TextCommand):
