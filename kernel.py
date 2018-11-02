@@ -262,6 +262,13 @@ class KernelConnection(object):
         self._connection_name = connection_name
         self._execution_state = 'unknown'
         self._init_receivers()
+        self.window = sublime.active_window()
+        self._panel_name = 'Hermes: {}'.format(
+            connection_name if connection_name is not None else kernel_id
+        )
+        self.panel = self.window.create_output_panel(
+            self._panel_name, unlisted=False
+        )
 
     def __del__(self):
         self._shell_msg_receiver.shutdown()
@@ -328,10 +335,10 @@ class KernelConnection(object):
         return self._execution_state
 
     @property
-    def _show_inline_output(self):
+    def _output_style(self):
         return (sublime
                 .load_settings("Hermes.sublime-settings")
-                .get("inline_output"))
+                .get("output_style"))
 
     def activate_view(self):
         """Activate view to show the output of kernel."""
@@ -397,7 +404,10 @@ class KernelConnection(object):
         self._write_text_to_view("\nOut[{}]: ".format(execution_count))
 
     def _write_text_to_view(self, text: str) -> None:
-        if self._show_inline_output:
+        if self._output_style == "panel":
+            self._write_text_to_panel(text)
+            return
+        elif self._output_style == "inline":
             return
         self.activate_view()
         view = self.get_view()
@@ -409,7 +419,7 @@ class KernelConnection(object):
         view.show(view.size())
 
     def _write_phantom(self, content: str):
-        if self._show_inline_output:
+        if self._output_style == "inline":
             return
         self.activate_view()
         file_size = self.get_view().size()
@@ -421,8 +431,14 @@ class KernelConnection(object):
             sublime.LAYOUT_BLOCK)
         self._logger.info("Created phantom {}".format(content))
 
+    def _write_text_to_panel(self, text: str) -> None:
+        self.window.run_command(
+            'show_panel', {'panel': 'output.{}'.format(self._panel_name)}
+        )
+        self.panel.run_command('append', {'characters': text, "scroll_to_end": True})
+
     def _write_inline_html_phantom(self, content: str, region: sublime.Region, view: sublime.View):
-        if self._show_inline_output:
+        if self._output_style == "inline":
             # region = self._inline_view.sel()[-1]
             id = HERMES_FIGURE_PHANTOMS + datetime.now().isoformat()
             html = TEXT_PHANTOM.format(content=content)
@@ -435,7 +451,7 @@ class KernelConnection(object):
             self._logger.info("Created inline phantom {}".format(html))
 
     def _write_inline_image_phantom(self, data: str, region: sublime.Region, view: sublime.View):
-        if self._show_inline_output:
+        if self._output_style == "inline":
             # region = self._inline_view.sel()[-1]
             id = HERMES_FIGURE_PHANTOMS + datetime.now().isoformat()
             html = IMAGE_PHANTOM.format(data=data)

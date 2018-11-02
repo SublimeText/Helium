@@ -7,7 +7,7 @@
   // # <codecell>
   "complete": true,  // Whether use Hermes' autocomplete powered by Jupyter kernel.
   "complete_timeout": 0.5, // Timeout to get completion (in seconds).
-  "inline_output": false, // Set to true to show output in current view, like Jupyter
+  "output_style": "default", // Set to 'inline' to show output in current view, like Jupyter, set to 'panel' to show output in Sublime's output panel
   "ssh_servers": {
   // List ssh servers.
   // "server_name_shown_in_menu": { // You can use arbitary name here.

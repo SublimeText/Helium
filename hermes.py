@@ -94,11 +94,11 @@ class ViewManager(object):
         """Connect view to kernel."""
         kernel = HermesKernelManager.get_kernel(kernel_id)
         cls.view_kernel_table[buffer_id] = kernel
-        inline_output = (
+        output_style = (
             sublime
             .load_settings("Hermes.sublime-settings")
-            .get("inline_output"))
-        if not inline_output:
+            .get("output_style"))
+        if output_style == "default":
             kernel.activate_view()
 
     @classmethod
