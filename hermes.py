@@ -665,7 +665,7 @@ def update_run_cell_phantoms(view, *, logger=HERMES_LOGGER):
     view.erase_phantoms(RUN_CELL_PHANTOM_ID)
 
     for i in range(len(limits) - 1):
-        code_region = sublime.Region(limits[i].end() + 1, limits[i+1].begin() - 1)
+        code_region = sublime.Region(limits[i].end() + 1, limits[i+1].begin() + 0)
         phantom_region = sublime.Region(limits[i].end(), limits[i].end())
         view.add_phantom(
             RUN_CELL_PHANTOM_ID,
@@ -736,7 +736,7 @@ def get_cell(view: sublime.View, region: sublime.Region, *, logger=HERMES_LOGGER
     separators = view.find_all(cell_delimiter_pattern)
     r = sublime.Region(region.begin()+1, region.begin()+1)
     start_point = separators[bisect.bisect(separators, r)-1].end() + 1
-    end_point = separators[bisect.bisect(separators, r)].begin() - 1
+    end_point = separators[bisect.bisect(separators, r)].begin() - 1 
     cell_region = sublime.Region(start_point, end_point)
     return (view.substr(cell_region), cell_region)
 
