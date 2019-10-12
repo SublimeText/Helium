@@ -1,0 +1,3 @@
+[
+    {"keys": ["ctrl+alt+enter"], "command": "hermes_execute_cell"}
+]
