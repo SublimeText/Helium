@@ -734,7 +734,9 @@ def get_cell(view: sublime.View, region: sublime.Region, *, logger=HERMES_LOGGER
         .get("cell_delimiter_pattern")
     )
     separators = view.find_all(cell_delimiter_pattern)
-    r = sublime.Region(region.begin()+1, region.begin()+1)
+    separators.append(sublime.Region(view.size() + 1, view.size() + 1))  
+    r = sublime.Region(region.begin(), region.begin())
+    print(str(separators) + ' ' + str(r))
     start_point = separators[bisect.bisect(separators, r)-1].end() + 1
     end_point = separators[bisect.bisect(separators, r)].begin() - 1 
     cell_region = sublime.Region(start_point, end_point)
@@ -924,7 +926,7 @@ class HermesGetObjectInspection(TextCommand):
             if code == pre_code:
                 continue
             kernel.get_inspection(code, cursor_pos)
-            log_info_msg = "Requested object inspection for code {code} with kernel {kernel_id}".format(
+            log_info_msg = "Requested object inspection for code {cod`e} with kernel {kernel_id}".format(
                 code=code,
                 kernel_id=kernel.kernel_id)
             logger.info(log_info_msg)
