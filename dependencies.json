@@ -3,7 +3,6 @@
 		"*": [
 			"dateutil",
 			"enum",
-			"paramiko",
 			"python-six",
 			"pyzmq"
 		]
