@@ -243,7 +243,7 @@ def _start_kernel(
     index = yield partial(
         window.show_quick_panel,
         menu_items)
-    
+
     cwd = None
     if view:
         cwd = os.path.dirname(view.file_name())
@@ -743,10 +743,10 @@ def get_cell(view: sublime.View, region: sublime.Region, *, logger=HERMES_LOGGER
         .get("cell_delimiter_pattern")
     )
     separators = view.find_all(cell_delimiter_pattern)
-    separators.append(sublime.Region(view.size() + 1, view.size() + 1))  
+    separators.append(sublime.Region(view.size() + 1, view.size() + 1))
     r = sublime.Region(region.begin(), region.begin())
     start_point = separators[bisect.bisect(separators, r)-1].end() + 1
-    end_point = separators[bisect.bisect(separators, r)].begin() - 1 
+    end_point = separators[bisect.bisect(separators, r)].begin() - 1
     cell_region = sublime.Region(start_point, end_point)
     return (view.substr(cell_region), cell_region)
 
