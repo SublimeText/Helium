@@ -169,12 +169,13 @@ class HermesKernelManager(object):
         kernelspec_name=None,
         connection_info=None,
         connection_name=None,
+        cwd=None
     ):
         """Start kernel and return a `Kernel` instance."""
         kernel_id = uuid.uuid4()
         if kernelspec_name:
             kernel_manager = KernelManager(kernel_name=kernelspec_name)
-            kernel_manager.start_kernel()
+            kernel_manager.start_kernel(cwd=cwd)
         elif connection_info:
             kernel_manager = KernelManager()
             kernel_manager.load_connection_info(connection_info)
@@ -243,6 +244,10 @@ def _start_kernel(
         window.show_quick_panel,
         menu_items)
 
+    cwd = None
+    if view:
+        cwd = os.path.dirname(view.file_name())
+
     if index == -1:
         return
     elif index == len(kernelspecs):
@@ -250,11 +255,14 @@ def _start_kernel(
         connection_info = yield partial(_enter_connection_info, window)
         connection_name = yield partial(
             window.show_input_panel, "connection name", "", on_change=None, on_cancel=None)
+
         if connection_name == "":
             connection_name = None
+
         kernel = HermesKernelManager.start_kernel(
             connection_info=connection_info,
-            connection_name=connection_name
+            connection_name=connection_name,
+            cwd=cwd
         )
     elif index == len(kernelspecs) + 1:
         # Create a kernel with SSH tunneling.
@@ -297,7 +305,8 @@ def _start_kernel(
             connection_name = None
         kernel = HermesKernelManager.start_kernel(
             kernelspec_name=selected_kernelspec,
-            connection_name=connection_name
+            connection_name=connection_name,
+            cwd=cwd
         )
     ViewManager.connect_kernel(
         view.buffer_id(),
@@ -665,7 +674,7 @@ def update_run_cell_phantoms(view, *, logger=HERMES_LOGGER):
     view.erase_phantoms(RUN_CELL_PHANTOM_ID)
 
     for i in range(len(limits) - 1):
-        code_region = sublime.Region(limits[i].end() + 1, limits[i+1].begin() - 1)
+        code_region = sublime.Region(limits[i].end() + 1, limits[i+1].begin() + 0)
         phantom_region = sublime.Region(limits[i].end(), limits[i].end())
         view.add_phantom(
             RUN_CELL_PHANTOM_ID,
@@ -734,7 +743,8 @@ def get_cell(view: sublime.View, region: sublime.Region, *, logger=HERMES_LOGGER
         .get("cell_delimiter_pattern")
     )
     separators = view.find_all(cell_delimiter_pattern)
-    r = sublime.Region(region.begin()+1, region.begin()+1)
+    separators.append(sublime.Region(view.size() + 1, view.size() + 1))
+    r = sublime.Region(region.begin(), region.begin())
     start_point = separators[bisect.bisect(separators, r)-1].end() + 1
     end_point = separators[bisect.bisect(separators, r)].begin() - 1
     cell_region = sublime.Region(start_point, end_point)
@@ -924,7 +934,7 @@ class HermesGetObjectInspection(TextCommand):
             if code == pre_code:
                 continue
             kernel.get_inspection(code, cursor_pos)
-            log_info_msg = "Requested object inspection for code {code} with kernel {kernel_id}".format(
+            log_info_msg = "Requested object inspection for code {cod`e} with kernel {kernel_id}".format(
                 code=code,
                 kernel_id=kernel.kernel_id)
             logger.info(log_info_msg)
