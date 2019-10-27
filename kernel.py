@@ -471,10 +471,6 @@ class KernelConnection(object):
             self._write_phantom(content)
             self._write_inline_html_phantom(content, region, view)
 
-            print('\n\n\n\n\n')
-            print(mime_data)
-            print('\n\n\n\n\n')
-
         if "image/png" in mime_data:
             data = mime_data["image/png"].strip()
             self._logger.info("Caught image.")
