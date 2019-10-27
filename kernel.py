@@ -10,6 +10,8 @@ from datetime import datetime
 from threading import Event, Thread, RLock
 from queue import Empty, Queue
 
+from .utils import get_png_dimensions
+
 import sublime
 
 from .utils import (
@@ -62,12 +64,13 @@ TEXT_PHANTOM = """<body id="hermes-result">
 
 IMAGE_PHANTOM = """<body id="hermes-image-result" style="background-color:white">
   <style>
-    .image {{ background-color: white }}
+    .image {{ background-color: white;}}
     .closebutton {{ text-decoration: none }}
   </style>
   <a class=closebutton href=hide>×</a>
   <br>
-  <img class="image" alt="Out" src="data:image/png;base64,{data}" />
+  <h1>Hallo welt</h1>
+  <img class="image" alt="Out" width="20" src="data:image/png;base64,{data}" />
 </body>"""
 
 STREAM_PHANTOM = "<div class={name}>{content}</div>"
@@ -438,7 +441,9 @@ class KernelConnection(object):
         if self._show_inline_output:
             # region = self._inline_view.sel()[-1]
             id = HERMES_FIGURE_PHANTOMS + datetime.now().isoformat()
-            html = IMAGE_PHANTOM.format(data=data)
+            width = view.viewport_extent()[0]
+            html = IMAGE_PHANTOM.format(data=data, width=width)
+
             view.add_phantom(
                 id,
                 region,
@@ -450,6 +455,7 @@ class KernelConnection(object):
     def _write_mime_data_to_view(self, mime_data: dict, region: sublime.Region, view: sublime.View) -> None:
         # Now we use basically text/plain for text type.
         # Jupyter kernels often emits html whom minihtml cannot render.
+
         if 'text/plain' in mime_data:
             content = mime_data["text/plain"]
             lines = "\n(display data): {content}".format(content=content)
@@ -465,16 +471,31 @@ class KernelConnection(object):
             self._write_phantom(content)
             self._write_inline_html_phantom(content, region, view)
 
+            print('\n\n\n\n\n')
+            print(mime_data)
+            print('\n\n\n\n\n')
+
         if "image/png" in mime_data:
             data = mime_data["image/png"].strip()
             self._logger.info("Caught image.")
             self._logger.info("RELOADED -------------=================")
+
+            #Getting view width and substract some padding
+            width = self.get_view().viewport_extent()[0] - 2
+            dimensions = get_png_dimensions(data)
+
+
+            scale_factor = width / dimensions[0]
+            height = dimensions[1] * scale_factor
+
             content = (
                 '<body style="background-color:white">' +
-                '<img alt="Out" src="data:image/png;base64,{data}" />' +
+                '<img alt="Out" style="width: {width}; height: {height}" src="data:image/png;base64,{data}" />' +
                 '</body>'
             ).format(
                 data=data,
+                width=width,
+                height=height,
                 bgcolor="white")
             self._write_phantom(content)
             self._write_inline_image_phantom(data, region, view)

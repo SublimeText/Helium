@@ -5,6 +5,8 @@ from functools import wraps
 import sublime
 from sublime_plugin import TextCommand
 
+from base64 import b64decode
+
 
 class add_path(object):
     """Temporarily insert a path into sys.path."""
@@ -96,3 +98,13 @@ def show_password_input(prompt, on_done, on_cancel):
             hide_input,
             on_cancel)
     )
+
+def get_png_dimensions(base64):
+    """
+    Extrac the dimension properties of the IHDR information encoded in base 64.
+    """
+
+    wh = b64decode(base64[20:32])
+    iwidth = int.from_bytes(wh[1:5], byteorder='big')
+    iheight = int.from_bytes(wh[5:], byteorder='big')
+    return (iwidth, iheight)
