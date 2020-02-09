@@ -72,9 +72,9 @@ STREAM_PHANTOM = "<div class={name}>{content}</div>"
 
 
 def fix_whitespace_for_phantom(text: str):
-    """Transform output for proper display
+    """Transform output for proper display.
 
-    This is important to display pandas DataFrames, for instance
+    This is important to display pandas DataFrames, for instance.
     """
     text = text.replace(" ", r"&nbsp;")
     text = "<br>".join(text.splitlines())
@@ -123,7 +123,7 @@ class KernelConnection(object):
         """Communicator that runs asynchroniously."""
 
         def run(self):
-            """Main routine."""
+            """Run main routine."""
             # TODO: log
             # TODO: remove view and regions from id2region
             while not self.exit.is_set():
@@ -146,7 +146,7 @@ class KernelConnection(object):
         """Receive and process IOPub messages."""
 
         def run(self):
-            """Main routine."""
+            """Run main routine."""
             # TODO: log, handle other message types.
             while not self.exit.is_set():
                 try:
@@ -209,7 +209,7 @@ class KernelConnection(object):
                 )
 
         def run(self):
-            """Main routine."""
+            """Run main routine."""
             # TODO: log, handle other message types.
             while not self.exit.is_set():
                 try:
@@ -302,12 +302,12 @@ class KernelConnection(object):
 
     @property
     def view_name(self):
-        """The name of output view."""
+        """Return name of output view."""
         return "*Hermes Output* {repr}".format(repr=self.repr)
 
     @property
     def repr(self):
-        """A string used as the representation of the connection"""
+        """Return string representation of the connection."""
         if self.connection_name:
             return "{connection_name} ([{lang}] {kernel_id})".format(
                 connection_name=self.connection_name,

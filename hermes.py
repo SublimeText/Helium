@@ -264,7 +264,8 @@ def _start_kernel(window, view, continue_cb=lambda: None, *, logger=HERMES_LOGGE
         servers = sublime.load_settings("Hermes.sublime-settings").get("ssh_servers")
         if not servers:
             sublime.message_dialog(
-                "Please set `ssh_servers` item of the config file via `Hermes: Settings` to connect SSH servers."
+                "Please set `ssh_servers` item of the config file via `Hermes: ` "
+                "to connect SSH servers."
             )
             return
         menu_items = list(servers.keys())
@@ -459,7 +460,7 @@ def _connect_kernel(window, view, *, continue_cb=lambda: None, logger=HERMES_LOG
         update_run_cell_phantoms(view)
 
         log_info_msg = (
-            "Connected view '{view_name}(id: {buffer_id})'" "to kernel {kernel_id}."
+            "Connected view '{view_name}(id: {buffer_id})' to kernel {kernel_id}."
         ).format(
             view_name=view_name,
             buffer_id=view.buffer_id(),
@@ -603,7 +604,7 @@ class HermesShutdownKernel(TextCommand):
 
 
 class HermesRunCellManager(ViewEventListener):
-    """Manage 'Run cell' phantoms"""
+    """Manage 'Run cell' phantoms."""
 
     def __init__(self, view):
         self.view = view
@@ -634,7 +635,7 @@ class HermesRunCellManager(ViewEventListener):
 
 
 def update_run_cell_phantoms(view, *, logger=HERMES_LOGGER):
-    """Add "Run Cell" links to each code cell"""
+    """Add "Run Cell" links to each code cell."""
 
     # find all cell delimiters:
 
@@ -806,8 +807,7 @@ class HermesExecuteCell(TextCommand):
         return self.is_enabled()
 
     def run(self, edit, move_cursor=False, *, logger=HERMES_LOGGER):
-        """Command definition.
-        If move_cursor is true, move the cursor to the next cell after execution.
+        """If move_cursor is true, move the cursor to the next cell after execution.
         """
         for s in self.view.sel():
             _execute_cell(self.view, s, logger=logger)
@@ -822,9 +822,10 @@ class HermesExecuteCell(TextCommand):
 
 
 class StatusBar(object):
-    """Status Bar with animation."""
+    """Status Bar with animation.
 
-    # This class is based on the one by @randy3k.
+    This class is based on the one by @randy3k.
+    """
 
     def __init__(self, view, width=10, interval=500):
         self.view = view

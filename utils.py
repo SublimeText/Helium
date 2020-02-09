@@ -21,7 +21,7 @@ class add_path(object):
 
 def chain_callbacks(f):
     # type: Callable[..., Generator[Callable[Callable[...], Any, Any]] -> Callable[..., Any]
-    """Decorator to enable mimicing promise pattern by yield expression.
+    """Decorate to mimic the promise pattern via an yield expression.
 
     Decorator function to make a wrapper which executes functions
     yielded by the given generator in order."""
@@ -57,7 +57,6 @@ class MaskInputPanelText(TextCommand):
     """Command to hide all the charatcters of view by '*'."""
 
     def run(self, edit):
-        """The command definition."""
         s = self.view.size()
         region = sublime.Region(0, s)
         self.view.replace(edit, region, s * "*")
