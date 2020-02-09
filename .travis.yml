@@ -1,9 +1,0 @@
-language: python
-python:
-  - "3.6"
-# command to install dependencies
-install:
-  - pip install flake8
-# command to run tests
-script:
-  - flake8 .
