@@ -716,7 +716,8 @@ def get_cell(
 ) -> (str, sublime.Region):
     """Get the code cell under the cursor.
 
-    Cells are separated by markers defined in `cell_delimiter_pattern` in the config file.
+    Cells are separated by markers.
+    Those are defined in `cell_delimiter_pattern` in the config file.
 
     If `s` is a selected region, the code cell is it.
     """
@@ -805,8 +806,7 @@ class HermesExecuteCell(TextCommand):
         return self.is_enabled()
 
     def run(self, edit, move_cursor=False, *, logger=HERMES_LOGGER):
-        """If move_cursor is true, move the cursor to the next cell after execution.
-        """
+        """If move_cursor is true, move the cursor to the next cell after execution."""
         for s in self.view.sel():
             _execute_cell(self.view, s, logger=logger)
 
@@ -815,7 +815,8 @@ class HermesExecuteCell(TextCommand):
             pt = sublime.Region(cell.end() + 1, cell.end() + 1)
             self.view.sel().clear()
             self.view.sel().add(pt)
-            # TODO: scroll to cursor after phantoms after Jupyter callback rather than fixed time
+            # TODO: scroll to cursor after phantoms after Jupyter callback
+            # rather than fixed time
             sublime.set_timeout(lambda: self.view.show(pt), 500)
 
 
@@ -914,9 +915,10 @@ class HermesGetObjectInspection(TextCommand):
             if code == pre_code:
                 continue
             kernel.get_inspection(code, cursor_pos)
-            log_info_msg = "Requested object inspection for code {cod`e} with kernel {kernel_id}".format(
-                code=code, kernel_id=kernel.kernel_id
-            )
+            log_info_msg = (
+                "Requested object inspection for code {code} with kernel {kernel_id}"
+            ).format(code=code, kernel_id=kernel.kernel_id)
+
             logger.info(log_info_msg)
             pre_code = code
 
@@ -936,9 +938,9 @@ class HermesCompleter(EventListener):
             kernel = ViewManager.get_kernel_for_view(view.buffer_id())
             location = locations[0]
             code = view.substr(view.line(location))
-            log_info_msg = "Requested completion for code {code} with kernel {kernel_id}".format(
-                code=code, kernel_id=kernel.kernel_id
-            )
+            log_info_msg = (
+                "Requested completion for code {code} with kernel {kernel_id}"
+            ).format(code=code, kernel_id=kernel.kernel_id)
             logger.info(log_info_msg)
             _, col = view.rowcol(location)
             return kernel.get_complete(code, col, timeout)

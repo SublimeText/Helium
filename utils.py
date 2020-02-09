@@ -12,10 +12,10 @@ class add_path(object):
     def __init__(self, path):
         self.path = path
 
-    def __enter__(self):
+    def __enter__(self):  # noqa
         sys.path.insert(0, self.path)
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback):  # noqa
         sys.path.remove(self.path)
 
 
@@ -24,7 +24,8 @@ def chain_callbacks(f):
     """Decorate to mimic the promise pattern via an yield expression.
 
     Decorator function to make a wrapper which executes functions
-    yielded by the given generator in order."""
+    yielded by the given generator in order.
+    """
 
     @wraps(f)
     def wrapper(*args, **kwargs):

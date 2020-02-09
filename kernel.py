@@ -109,7 +109,7 @@ def extract_data(result):
 class KernelConnection(object):
     """Interact with a Jupyter kernel."""
 
-    class MessageReceiver(Thread):
+    class MessageReceiver(Thread):  # noqa
         def __init__(self, kernel):
             """Initialize AsyncCommunicator class."""
             super().__init__()
