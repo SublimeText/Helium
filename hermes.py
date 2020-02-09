@@ -112,7 +112,6 @@ class ViewManager(object):
 class HermesKernelManager(object):
     """Manage Jupyter kernels."""
 
-    # type: Dict[Tuple[str, str], KernelConnection]
     # The key is a tuple consisted of the name of kernelspec and kernel ID,
     # the value is a KernelConnection instance correspond to it.
     kernels = {}

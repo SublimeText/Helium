@@ -20,7 +20,6 @@ class add_path(object):
 
 
 def chain_callbacks(f):
-    # type: Callable[..., Generator[Callable[Callable[...], Any, Any]] -> Callable[..., Any]
     """Decorate to mimic the promise pattern via an yield expression.
 
     Decorator function to make a wrapper which executes functions
