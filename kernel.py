@@ -352,7 +352,8 @@ class KernelConnection(object):
         view: sublime.View = None,
     ) -> None:
         try:
-            lines = "\nError[{execution_count}]: {ename}, {evalue}.\nTraceback:\n{traceback}".format(
+            lines = "\nError[{execution_count}]: {ename}, {evalue}."
+            "\nTraceback:\n{traceback}".format(
                 execution_count=execution_count,
                 ename=ename,
                 evalue=evalue,
@@ -455,7 +456,8 @@ class KernelConnection(object):
             )
         elif "text/html" in mime_data:
             self._logger.info(
-                "Caught 'text/html' output without plain text. Try to show with phantom."
+                "Caught 'text/html' output without plain text. "
+                "Try to show with phantom."
             )
             content = mime_data["text/html"]
             self._write_phantom(content)
