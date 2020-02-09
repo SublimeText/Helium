@@ -471,7 +471,7 @@ def _connect_kernel(window, view, *, continue_cb=lambda: None, logger=HERMES_LOG
 
 
 class HermesConnectKernel(TextCommand):
-    """Connect to jupyter kernel."""
+    """Connect to Jupyter kernel."""
 
     def run(self, edit, *, logger=HERMES_LOGGER):
         """Command definition."""
@@ -480,7 +480,7 @@ class HermesConnectKernel(TextCommand):
 
 @chain_callbacks
 def _show_kernel_selection_menu(window, view, cb, *, add_new=False):
-    # Get the kurnel ID related to `view` if exists.
+    # Get the kernel ID related to `view` if exists.
     try:
         current_kernel_id = ViewManager.get_kernel_for_view(view.buffer_id()).kernel_id
     except KeyError:
@@ -523,7 +523,7 @@ def _interrupt_kernel(window, view, *, continue_cb=lambda: None, logger=HERMES_L
 
 
 class HermesInterruptKernel(TextCommand):
-    """Interrupt jupyter kernel."""
+    """Interrupt Jupyter kernel."""
 
     def is_enabled(self, *, logger=HERMES_LOGGER):
         try:
@@ -553,7 +553,7 @@ def _restart_kernel(window, view, *, continue_cb=lambda: None, logger=HERMES_LOG
 
 
 class HermesRestartKernel(TextCommand):
-    """Restart jupyter kernel."""
+    """Restart Jupyter kernel."""
 
     def is_enabled(self, *, logger=HERMES_LOGGER):
         try:
@@ -585,7 +585,7 @@ def _shutdown_kernel(window, view, *, continue_cb=lambda: None, logger=HERMES_LO
 
 
 class HermesShutdownKernel(TextCommand):
-    """Shutdown jupyter kernel."""
+    """Shutdown Jupyter kernel."""
 
     def is_enabled(self, *, logger=HERMES_LOGGER):
         try:
@@ -926,7 +926,7 @@ class HermesCompleter(EventListener):
     """Completer."""
 
     def on_query_completions(self, view, prefix, locations, *, logger=HERMES_LOGGER):
-        """Get completions from the jupyter kernel."""
+        """Get completions from the Jupyter kernel."""
         use_complete = sublime.load_settings("Hermes.sublime-settings").get("complete")
         if not use_complete:
             return None
