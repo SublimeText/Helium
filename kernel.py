@@ -124,7 +124,7 @@ class KernelConnection(object):
 
         def run(self):
             """Run main routine."""
-            # TODO: log
+            # TODO: implement logging
             # TODO: remove view and regions from id2region
             while not self.exit.is_set():
                 try:
@@ -257,7 +257,7 @@ class KernelConnection(object):
         self._execution_state = "unknown"
         self._init_receivers()
 
-    def __del__(self):
+    def __del__(self):  # noqa
         self._shell_msg_receiver.shutdown()
         self._iopub_msg_receiver.shutdown()
         self._stdin_msg_receiver.shutdown()
@@ -414,7 +414,6 @@ class KernelConnection(object):
         self, content: str, region: sublime.Region, view: sublime.View
     ):
         if self._show_inline_output:
-            # region = self._inline_view.sel()[-1]
             id = HERMES_FIGURE_PHANTOMS + datetime.now().isoformat()
             html = TEXT_PHANTOM.format(content=content)
             view.add_phantom(
@@ -430,7 +429,6 @@ class KernelConnection(object):
         self, data: str, region: sublime.Region, view: sublime.View
     ):
         if self._show_inline_output:
-            # region = self._inline_view.sel()[-1]
             id = HERMES_FIGURE_PHANTOMS + datetime.now().isoformat()
             html = IMAGE_PHANTOM.format(data=data)
             view.add_phantom(
