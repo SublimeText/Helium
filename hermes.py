@@ -76,7 +76,7 @@ def _refresh_jupyter_path():
 class ViewManager(object):
     """Manage the relation of views and kernels."""
 
-    view_kernel_table = dict()
+    view_kernel_table = {}
 
     def __new__(cls, *args, **kwargs):
         if not hasattr(cls, "__instance__"):
@@ -115,7 +115,7 @@ class HermesKernelManager(object):
     # type: Dict[Tuple[str, str], KernelConnection]
     # The key is a tuple consisted of the name of kernelspec and kernel ID,
     # the value is a KernelConnection instance correspond to it.
-    kernels = dict()
+    kernels = {}
     logger = HERMES_LOGGER
 
     def __new__(cls, *args, **kwargs):

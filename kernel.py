@@ -152,7 +152,7 @@ class KernelConnection(object):
                 try:
                     msg = self._kernel.client.get_iopub_msg(timeout=1)
                     self._kernel._logger.info(msg)
-                    content = msg.get("content", dict())
+                    content = msg.get("content", {})
                     execution_count = content.get("execution_count", None)
                     msg_type = msg["msg_type"]
                     view, region = self._kernel.id2region.get(
@@ -485,8 +485,9 @@ class KernelConnection(object):
             text = remove_ansi_escape(reply["text/plain"])
             view.run_command("append", {"characters": text})
             window.run_command(
-                "show_panel", dict(panel="output." + HERMES_OBJECT_INSPECT_PANEL)
+                "show_panel", {"panel": "output." + HERMES_OBJECT_INSPECT_PANEL}
             )
+
         except KeyError as ex:
             self._logger.exception(ex)
 
