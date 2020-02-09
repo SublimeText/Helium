@@ -6,4 +6,4 @@ install:
   - pip install flake8
 # command to run tests
 script:
-  - flake8 . --max-line-length=120 --exclude .git,lib,__pycache__
+  - flake8 . --max-line-length=88 --exclude .git,lib,__pycache__

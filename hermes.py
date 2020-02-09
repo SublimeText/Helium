@@ -636,9 +636,7 @@ class HermesRunCellManager(ViewEventListener):
 
 def update_run_cell_phantoms(view, *, logger=HERMES_LOGGER):
     """Add "Run Cell" links to each code cell."""
-
     # find all cell delimiters:
-
     cell_delimiter_pattern = sublime.load_settings("Hermes.sublime-settings").get(
         "cell_delimiter_pattern"
     )
