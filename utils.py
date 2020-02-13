@@ -12,19 +12,20 @@ class add_path(object):
     def __init__(self, path):
         self.path = path
 
-    def __enter__(self):
+    def __enter__(self):  # noqa
         sys.path.insert(0, self.path)
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback):  # noqa
         sys.path.remove(self.path)
 
 
 def chain_callbacks(f):
-    # type: Callable[..., Generator[Callable[Callable[...], Any, Any]] -> Callable[..., Any]
-    """Decorator to enable mimicing promise pattern by yield expression.
+    """Decorate to mimic the promise pattern via an yield expression.
 
     Decorator function to make a wrapper which executes functions
-    yielded by the given generator in order."""
+    yielded by the given generator in order.
+    """
+
     @wraps(f)
     def wrapper(*args, **kwargs):
         chain = f(*args, **kwargs)
@@ -43,7 +44,9 @@ def chain_callbacks(f):
                 next_f(cb)
             except StopIteration:
                 return
+
         next_f(cb)
+
     return wrapper
 
 
@@ -54,7 +57,6 @@ class MaskInputPanelText(TextCommand):
     """Command to hide all the charatcters of view by '*'."""
 
     def run(self, edit):
-        """The command definition."""
         s = self.view.size()
         region = sublime.Region(0, s)
         self.view.replace(edit, region, s * "*")
@@ -76,23 +78,20 @@ def show_password_input(prompt, on_done, on_cancel):
         if matches:
             # When there are characters other than "*"
             pre, new, post = matches.group(1, 2, 3)
-            hidden_input = hidden_input[:len(pre)] + new + hidden_input[len(hidden_input)-len(post):len(hidden_input)]
+            hidden_input = (
+                hidden_input[: len(pre)]
+                + new
+                + hidden_input[len(hidden_input) - len(post) : len(hidden_input)]
+            )
             view.run_command("mask_input_panel_text")
         else:
             try:
                 pos = view.sel()[0].begin()
-                hidden_input = hidden_input[:pos] + hidden_input[pos:len(user_input)]
+                hidden_input = hidden_input[:pos] + hidden_input[pos : len(user_input)]
             except AttributeError:
                 # `view` is not assigned at first time this function is called.
                 pass
 
-    view = (
-        sublime
-        .active_window()
-        .show_input_panel(
-            prompt,
-            "",
-            get_hidden_input,
-            hide_input,
-            on_cancel)
+    view = sublime.active_window().show_input_panel(
+        prompt, "", get_hidden_input, hide_input, on_cancel
     )

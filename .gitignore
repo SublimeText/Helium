@@ -1,3 +1,7 @@
+# Python Stuff
 *.pyc
+.venv/
+
+# Sublime Stuff
 *.sublime-project
 *.sublime-workspace
