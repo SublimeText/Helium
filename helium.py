@@ -16,11 +16,11 @@ from logging import getLogger, INFO, StreamHandler
 
 import sublime
 from sublime_plugin import TextCommand, EventListener, ViewEventListener
-from .kernel import KernelConnection
+from .lib.kernel import KernelConnection
 
-from .utils import add_path, chain_callbacks
+from .lib.utils import add_path, chain_callbacks
 
-with add_path(os.path.join(os.path.dirname(__file__), "lib")):
+with add_path(os.path.join(os.path.dirname(__file__), "lib/client")):
     # Import jupyter_client related functions and classes.
     # Temporarily insert `lib` into sys.path not to affect other packages.
     from jupyter_client.connect import tunnel_to_kernel
