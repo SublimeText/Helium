@@ -1,4 +1,4 @@
-Hermes package is licensed under GNU GENERAL PUBLIC LICENSE Version 2.
+Helium package is licensed under GNU GENERAL PUBLIC LICENSE Version 2.
 YEAR: 2016-2018
 COPYRIGHT HOLDER: NEGORO Tetsuya
 

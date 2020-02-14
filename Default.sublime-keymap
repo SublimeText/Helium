@@ -1,3 +1,3 @@
 [
-    {"keys": ["ctrl+alt+enter"], "command": "hermes_execute_cell"}
+    {"keys": ["ctrl+alt+enter"], "command": "helium_execute_cell"}
 ]

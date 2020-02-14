@@ -1,53 +1,53 @@
 [
   {
-    "caption": "Hermes: Connect Kernel",
-    "command": "hermes_connect_kernel"
+    "caption": "Helium: Connect Kernel",
+    "command": "helium_connect_kernel"
   },
   {
-    "caption": "Hermes: Start Kernel",
-    "command": "hermes_start_kernel"
+    "caption": "Helium: Start Kernel",
+    "command": "helium_start_kernel"
   },
   {
-    "caption": "Hermes: Shutdown Kernel",
-    "command": "hermes_shutdown_kernel"
+    "caption": "Helium: Shutdown Kernel",
+    "command": "helium_shutdown_kernel"
   },
   {
-    "caption": "Hermes: Restart Kernel",
-    "command": "hermes_restart_kernel"
+    "caption": "Helium: Restart Kernel",
+    "command": "helium_restart_kernel"
   },
   {
-    "caption": "Hermes: Interrupt Kernel",
-    "command": "hermes_interrupt_kernel"
+    "caption": "Helium: Interrupt Kernel",
+    "command": "helium_interrupt_kernel"
   },
   {
-    "caption": "Hermes: Execute Block",
-    "command": "hermes_execute_block"
+    "caption": "Helium: Execute Block",
+    "command": "helium_execute_block"
   },
   {
-    "caption": "Hermes: Execute Cell",
-    "command": "hermes_execute_cell"
+    "caption": "Helium: Execute Cell",
+    "command": "helium_execute_cell"
   },
   {
-    "caption": "Hermes: Execute Cell and Move",
-    "command": "hermes_execute_cell", "args":
+    "caption": "Helium: Execute Cell and Move",
+    "command": "helium_execute_cell", "args":
     {
       "move_cursor": "True"
     }
   },
   {
-    "caption": "Hermes: List Kernels",
-    "command": "hermes_list_kernels"
+    "caption": "Helium: List Kernels",
+    "command": "helium_list_kernels"
   },
   {
-    "caption": "Hermes: Get Object Inspection",
-    "command": "hermes_get_object_inspection"
+    "caption": "Helium: Get Object Inspection",
+    "command": "helium_get_object_inspection"
   },
   {
-    "caption": "Hermes: Settings",
+    "caption": "Helium: Settings",
     "command": "edit_settings", "args":
     {
-      "base_file": "${packages}/Hermes/Hermes.sublime-settings",
+      "base_file": "${packages}/Helium/Helium.sublime-settings",
       "default": "{\n  \"connections\": [\n    $0\n  ]\n}"
     }
-  },
+  }
 ]

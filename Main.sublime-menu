@@ -12,20 +12,20 @@
                 "children":
                 [
                     {
-                        "caption": "Hermes",
+                        "caption": "Helium",
                         "children":
                         [
                             {
                                 "command": "open_file", "args":
                                 {
-                                    "file": "${packages}/Hermes/Hermes.sublime-settings"
+                                    "file": "${packages}/Helium/Helium.sublime-settings"
                                 },
                                 "caption": "Settings – Default"
                             },
                             {
                                 "command": "open_file", "args":
                                 {
-                                    "file": "${packages}/User/Hermes.sublime-settings"
+                                    "file": "${packages}/User/Helium.sublime-settings"
                                 },
                                 "caption": "Settings – User"
                             },

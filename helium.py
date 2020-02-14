@@ -1,4 +1,4 @@
-"""Hermes package for Sublime Text 3.
+"""Helium package for Sublime Text 3.
 
 The package provides code execution and completion in interaction with Jupyter.
 
@@ -29,20 +29,20 @@ with add_path(os.path.join(os.path.dirname(__file__), "lib")):
 
 
 # Logger setting
-HERMES_LOGGER = getLogger(__name__)
+HELIUM_LOGGER = getLogger(__name__)
 HANDLER = StreamHandler()
 HANDLER.setLevel(INFO)
 
-if len(HERMES_LOGGER.handlers) == 0:
-    HERMES_LOGGER.setLevel(INFO)
-    HERMES_LOGGER.addHandler(HANDLER)
+if len(HELIUM_LOGGER.handlers) == 0:
+    HELIUM_LOGGER.setLevel(INFO)
+    HELIUM_LOGGER.addHandler(HANDLER)
 
 # Regex patterns to extract code lines.
 INDENT_PATTERN = re.compile(r"^([ \t]*)")
 
 
 # TODO: move CSS into separate file
-RUN_CELL_PHANTOM = """<body id="hermes-runCell">
+RUN_CELL_PHANTOM = """<body id="helium-runCell">
   <style>
     .runCell {
         text-decoration: none;
@@ -54,14 +54,14 @@ RUN_CELL_PHANTOM = """<body id="hermes-runCell">
 </body>
 """
 
-RUN_CELL_PHANTOM_ID = "HermesRunCell"
+RUN_CELL_PHANTOM_ID = "HeliumRunCell"
 
 
 ORG_JUPYTER_PATH = os.environ.get("JUPYTER_PATH")
 
 
 def _refresh_jupyter_path():
-    additional_jupyter_path = sublime.load_settings("Hermes.sublime-settings").get(
+    additional_jupyter_path = sublime.load_settings("Helium.sublime-settings").get(
         "jupyter_path"
     )
     os.environ["JUPYTER_PATH"] = ":".join(
@@ -89,9 +89,9 @@ class ViewManager(object):
     @classmethod
     def connect_kernel(cls, buffer_id, lang, kernel_id):
         """Connect view to kernel."""
-        kernel = HermesKernelManager.get_kernel(kernel_id)
+        kernel = HeliumKernelManager.get_kernel(kernel_id)
         cls.view_kernel_table[buffer_id] = kernel
-        inline_output = sublime.load_settings("Hermes.sublime-settings").get(
+        inline_output = sublime.load_settings("Helium.sublime-settings").get(
             "inline_output"
         )
         if not inline_output:
@@ -109,18 +109,18 @@ class ViewManager(object):
         return cls.view_kernel_table[buffer_id]
 
 
-class HermesKernelManager(object):
+class HeliumKernelManager(object):
     """Manage Jupyter kernels."""
 
     # The key is a tuple consisted of the name of kernelspec and kernel ID,
     # the value is a KernelConnection instance correspond to it.
     kernels = {}
-    logger = HERMES_LOGGER
+    logger = HELIUM_LOGGER
 
     def __new__(cls, *args, **kwargs):
         """Make this class a singleton."""
         if not hasattr(cls, "__instance__"):
-            cls.__instance__ = super(HermesKernelManager, object).__new__(
+            cls.__instance__ = super(HeliumKernelManager, object).__new__(
                 cls, *args, **kwargs
             )
         return cls.__instance__
@@ -227,8 +227,8 @@ def _enter_connection_info(window, continue_cb):
 
 
 @chain_callbacks
-def _start_kernel(window, view, continue_cb=lambda: None, *, logger=HERMES_LOGGER):
-    kernelspecs = HermesKernelManager.list_kernelspecs()
+def _start_kernel(window, view, continue_cb=lambda: None, *, logger=HELIUM_LOGGER):
+    kernelspecs = HeliumKernelManager.list_kernelspecs()
     menu_items = list(kernelspecs.keys()) + [
         "(Enter connection info)",
         "(Connect remote kernel via SSH)",
@@ -255,15 +255,15 @@ def _start_kernel(window, view, continue_cb=lambda: None, *, logger=HERMES_LOGGE
         if connection_name == "":
             connection_name = None
 
-        kernel = HermesKernelManager.start_kernel(
+        kernel = HeliumKernelManager.start_kernel(
             connection_info=connection_info, connection_name=connection_name, cwd=cwd
         )
     elif index == len(kernelspecs) + 1:
         # Create a kernel with SSH tunneling.
-        servers = sublime.load_settings("Hermes.sublime-settings").get("ssh_servers")
+        servers = sublime.load_settings("Helium.sublime-settings").get("ssh_servers")
         if not servers:
             sublime.message_dialog(
-                "Please set `ssh_servers` item of the config file via `Hermes: ` "
+                "Please set `ssh_servers` item of the config file via `Helium: ` "
                 "to connect SSH servers."
             )
             return
@@ -288,7 +288,7 @@ def _start_kernel(window, view, continue_cb=lambda: None, *, logger=HERMES_LOGGE
             on_change=None,
             on_cancel=None,
         )
-        kernel = HermesKernelManager.start_kernel(
+        kernel = HeliumKernelManager.start_kernel(
             connection_info=connection_info, connection_name=connection_name
         )
     else:
@@ -303,7 +303,7 @@ def _start_kernel(window, view, continue_cb=lambda: None, *, logger=HERMES_LOGGE
         )
         if connection_name == "":
             connection_name = None
-        kernel = HermesKernelManager.start_kernel(
+        kernel = HeliumKernelManager.start_kernel(
             kernelspec_name=selected_kernelspec,
             connection_name=connection_name,
             cwd=cwd,
@@ -323,10 +323,10 @@ def _start_kernel(window, view, continue_cb=lambda: None, *, logger=HERMES_LOGGE
     continue_cb()
 
 
-class HermesStartKernel(TextCommand):
+class HeliumStartKernel(TextCommand):
     """Start a kernel and connect view to it."""
 
-    def run(self, edit, *, logger=HERMES_LOGGER):
+    def run(self, edit, *, logger=HELIUM_LOGGER):
         """Command definition."""
         _start_kernel(sublime.active_window(), self.view)
 
@@ -342,7 +342,7 @@ class ListKernelsSubcommands(object):
 
 
 @chain_callbacks
-def _list_kernels(window, view, *, logger=HERMES_LOGGER):
+def _list_kernels(window, view, *, logger=HELIUM_LOGGER):
     sc = ListKernelsSubcommands
     selected_kernel = yield partial(
         _show_kernel_selection_menu, window, view, add_new=True
@@ -387,7 +387,7 @@ def _list_kernels(window, view, *, logger=HERMES_LOGGER):
         logger.info(log_info_msg)
     elif subcommands[index] is sc.rename:
         # Rename
-        conn = HermesKernelManager.get_kernel(selected_kernel["id"])
+        conn = HeliumKernelManager.get_kernel(selected_kernel["id"])
         curr_name = conn.connection_name if conn.connection_name is not None else ""
         new_name = yield partial(
             window.show_input_panel,
@@ -399,21 +399,21 @@ def _list_kernels(window, view, *, logger=HERMES_LOGGER):
         conn.connection_name = new_name
     elif subcommands[index] is sc.interrupt:
         # Interrupt
-        HermesKernelManager.interrupt_kernel(selected_kernel["id"])
+        HeliumKernelManager.interrupt_kernel(selected_kernel["id"])
         log_info_msg = ("Interrupted kernel {kernel_id}.").format(
             kernel_id=selected_kernel["id"]
         )
         logger.info(log_info_msg)
     elif subcommands[index] is sc.restart:
         # Restart
-        HermesKernelManager.restart_kernel(selected_kernel["id"])
+        HeliumKernelManager.restart_kernel(selected_kernel["id"])
         log_info_msg = ("Restarted kernel {kernel_id}.").format(
             kernel_id=selected_kernel["id"]
         )
         logger.info(log_info_msg)
     elif subcommands[index] is sc.shutdown:
         # Shutdown
-        HermesKernelManager.shutdown_kernel(selected_kernel["id"])
+        HeliumKernelManager.shutdown_kernel(selected_kernel["id"])
         log_info_msg = ("Shutdown kernel {kernel_id}.").format(
             kernel_id=selected_kernel["id"]
         )
@@ -424,16 +424,16 @@ def _list_kernels(window, view, *, logger=HERMES_LOGGER):
     sublime.set_timeout_async(lambda: StatusBar(view), 0)
 
 
-class HermesListKernels(TextCommand):
+class HeliumListKernels(TextCommand):
     """Command that shows the list of kernels and do some action for chosen kernels."""
 
-    def run(self, edit, *, logger=HERMES_LOGGER):
+    def run(self, edit, *, logger=HELIUM_LOGGER):
         _list_kernels(sublime.active_window(), self.view)
 
 
 @chain_callbacks
-def _connect_kernel(window, view, *, continue_cb=lambda: None, logger=HERMES_LOGGER):
-    kernel_list = HermesKernelManager.list_kernels()
+def _connect_kernel(window, view, *, continue_cb=lambda: None, logger=HELIUM_LOGGER):
+    kernel_list = HeliumKernelManager.list_kernels()
     menu_items = [
         "[{lang}] {kernel_id}".format(lang=kernel["name"], kernel_id=kernel["id"])
         for kernel in kernel_list
@@ -470,10 +470,10 @@ def _connect_kernel(window, view, *, continue_cb=lambda: None, logger=HERMES_LOG
     continue_cb()
 
 
-class HermesConnectKernel(TextCommand):
+class HeliumConnectKernel(TextCommand):
     """Connect to Jupyter kernel."""
 
-    def run(self, edit, *, logger=HERMES_LOGGER):
+    def run(self, edit, *, logger=HELIUM_LOGGER):
         """Command definition."""
         _connect_kernel(sublime.active_window(), self.view, logger=logger)
 
@@ -485,7 +485,7 @@ def _show_kernel_selection_menu(window, view, cb, *, add_new=False):
         current_kernel_id = ViewManager.get_kernel_for_view(view.buffer_id()).kernel_id
     except KeyError:
         # TODO fix to use property of views.
-        result = re.match(r"\*Hermes Output\* .*?\(\[.*?\] ([\w-]*)\)", view.name())
+        result = re.match(r"\*Helium Output\* .*?\(\[.*?\] ([\w-]*)\)", view.name())
         if result:
             current_kernel_id = result.group(1)
         else:
@@ -493,10 +493,10 @@ def _show_kernel_selection_menu(window, view, cb, *, add_new=False):
 
     # It's better to pass the list of (connection_name, kernel_id) tuples
     # to improve the appearane of the menu.
-    kernel_list = HermesKernelManager.list_kernels()
+    kernel_list = HeliumKernelManager.list_kernels()
     menu_items = [
         "* " + repr if kernel["id"] == current_kernel_id else repr
-        for repr, kernel in zip(HermesKernelManager.list_kernel_reprs(), kernel_list)
+        for repr, kernel in zip(HeliumKernelManager.list_kernel_reprs(), kernel_list)
     ]
     if add_new:
         menu_items += ["New kernel"]
@@ -511,10 +511,10 @@ def _show_kernel_selection_menu(window, view, cb, *, add_new=False):
 
 
 @chain_callbacks
-def _interrupt_kernel(window, view, *, continue_cb=lambda: None, logger=HERMES_LOGGER):
+def _interrupt_kernel(window, view, *, continue_cb=lambda: None, logger=HELIUM_LOGGER):
     selected_kernel = yield partial(_show_kernel_selection_menu, window, view)
     if selected_kernel is not None:
-        HermesKernelManager.interrupt_kernel(selected_kernel["id"])
+        HeliumKernelManager.interrupt_kernel(selected_kernel["id"])
         log_info_msg = ("Interrupted kernel {kernel_id}.").format(
             kernel_id=selected_kernel["id"]
         )
@@ -522,29 +522,29 @@ def _interrupt_kernel(window, view, *, continue_cb=lambda: None, logger=HERMES_L
     continue_cb()
 
 
-class HermesInterruptKernel(TextCommand):
+class HeliumInterruptKernel(TextCommand):
     """Interrupt Jupyter kernel."""
 
-    def is_enabled(self, *, logger=HERMES_LOGGER):
+    def is_enabled(self, *, logger=HELIUM_LOGGER):
         try:
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except KeyError:
             return False
-        return HermesKernelManager.get_kernel(kernel.kernel_id).is_alive()
+        return HeliumKernelManager.get_kernel(kernel.kernel_id).is_alive()
 
-    def is_visible(self, *, logger=HERMES_LOGGER):
+    def is_visible(self, *, logger=HELIUM_LOGGER):
         return self.is_enabled()
 
-    def run(self, edit, *, logger=HERMES_LOGGER):
+    def run(self, edit, *, logger=HELIUM_LOGGER):
         """Command definition."""
         _interrupt_kernel(sublime.active_window(), self.view, logger=logger)
 
 
 @chain_callbacks
-def _restart_kernel(window, view, *, continue_cb=lambda: None, logger=HERMES_LOGGER):
+def _restart_kernel(window, view, *, continue_cb=lambda: None, logger=HELIUM_LOGGER):
     selected_kernel = yield partial(_show_kernel_selection_menu, window, view)
     if selected_kernel is not None:
-        HermesKernelManager.restart_kernel(selected_kernel["id"])
+        HeliumKernelManager.restart_kernel(selected_kernel["id"])
         log_info_msg = ("Restarted kernel {kernel_id}.").format(
             kernel_id=selected_kernel["id"]
         )
@@ -552,57 +552,57 @@ def _restart_kernel(window, view, *, continue_cb=lambda: None, logger=HERMES_LOG
     continue_cb()
 
 
-class HermesRestartKernel(TextCommand):
+class HeliumRestartKernel(TextCommand):
     """Restart Jupyter kernel."""
 
-    def is_enabled(self, *, logger=HERMES_LOGGER):
+    def is_enabled(self, *, logger=HELIUM_LOGGER):
         try:
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except KeyError:
             return False
-        return HermesKernelManager.get_kernel(kernel.kernel_id).is_alive()
+        return HeliumKernelManager.get_kernel(kernel.kernel_id).is_alive()
 
-    def is_visible(self, *, logger=HERMES_LOGGER):
+    def is_visible(self, *, logger=HELIUM_LOGGER):
         return self.is_enabled()
 
-    def run(self, edit, *, logger=HERMES_LOGGER):
+    def run(self, edit, *, logger=HELIUM_LOGGER):
         """Command definition."""
         _restart_kernel(sublime.active_window(), self.view, logger=logger)
 
 
 @chain_callbacks
-def _shutdown_kernel(window, view, *, continue_cb=lambda: None, logger=HERMES_LOGGER):
+def _shutdown_kernel(window, view, *, continue_cb=lambda: None, logger=HELIUM_LOGGER):
     selected_kernel = yield partial(_show_kernel_selection_menu, window, view)
     if selected_kernel is not None:
-        HermesKernelManager.shutdown_kernel(selected_kernel["id"])
+        HeliumKernelManager.shutdown_kernel(selected_kernel["id"])
         log_info_msg = ("Shutdown kernel {kernel_id}.").format(
             kernel_id=selected_kernel["id"]
         )
         logger.info(log_info_msg)
     ViewManager.remove_view(view.buffer_id())
-    view.set_status("hermes_connected_kernel", "")
+    view.set_status("helium_connected_kernel", "")
     continue_cb()
 
 
-class HermesShutdownKernel(TextCommand):
+class HeliumShutdownKernel(TextCommand):
     """Shutdown Jupyter kernel."""
 
-    def is_enabled(self, *, logger=HERMES_LOGGER):
+    def is_enabled(self, *, logger=HELIUM_LOGGER):
         try:
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except KeyError:
             return False
-        return HermesKernelManager.get_kernel(kernel.kernel_id).is_alive()
+        return HeliumKernelManager.get_kernel(kernel.kernel_id).is_alive()
 
-    def is_visible(self, *, logger=HERMES_LOGGER):
+    def is_visible(self, *, logger=HELIUM_LOGGER):
         return self.is_enabled()
 
-    def run(self, edit, *, logger=HERMES_LOGGER):
+    def run(self, edit, *, logger=HELIUM_LOGGER):
         """Command definition."""
         _shutdown_kernel(sublime.active_window(), self.view, logger=logger)
 
 
-class HermesRunCellManager(ViewEventListener):
+class HeliumRunCellManager(ViewEventListener):
     """Manage 'Run cell' phantoms."""
 
     def __init__(self, view):
@@ -610,7 +610,7 @@ class HermesRunCellManager(ViewEventListener):
         self.timeout_scheduled = False
         self.needs_update = False
 
-    def on_modified(self, *, logger=HERMES_LOGGER):
+    def on_modified(self, *, logger=HELIUM_LOGGER):
         try:
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
             if not kernel.is_alive():
@@ -633,10 +633,10 @@ class HermesRunCellManager(ViewEventListener):
             update_run_cell_phantoms(self.view)
 
 
-def update_run_cell_phantoms(view, *, logger=HERMES_LOGGER):
+def update_run_cell_phantoms(view, *, logger=HELIUM_LOGGER):
     """Add "Run Cell" links to each code cell."""
     # find all cell delimiters:
-    cell_delimiter_pattern = sublime.load_settings("Hermes.sublime-settings").get(
+    cell_delimiter_pattern = sublime.load_settings("Helium.sublime-settings").get(
         "cell_delimiter_pattern"
     )
     limits = view.find_all(cell_delimiter_pattern)
@@ -711,7 +711,7 @@ def get_block(view: sublime.View, s: sublime.Region) -> (str, sublime.Region):
 
 
 def get_cell(
-    view: sublime.View, region: sublime.Region, *, logger=HERMES_LOGGER
+    view: sublime.View, region: sublime.Region, *, logger=HELIUM_LOGGER
 ) -> (str, sublime.Region):
     """Get the code cell under the cursor.
 
@@ -722,7 +722,7 @@ def get_cell(
     """
     if not region.empty():
         return (view.substr(region), region)
-    cell_delimiter_pattern = sublime.load_settings("Hermes.sublime-settings").get(
+    cell_delimiter_pattern = sublime.load_settings("Helium.sublime-settings").get(
         "cell_delimiter_pattern"
     )
     separators = view.find_all(cell_delimiter_pattern)
@@ -735,7 +735,7 @@ def get_cell(
 
 
 @chain_callbacks
-def _execute_block(view, *, logger=HERMES_LOGGER):
+def _execute_block(view, *, logger=HELIUM_LOGGER):
     try:
         kernel = ViewManager.get_kernel_for_view(view.buffer_id())
     except KeyError:
@@ -757,7 +757,7 @@ def _execute_block(view, *, logger=HERMES_LOGGER):
 
 
 @chain_callbacks
-def _execute_cell(view, region: sublime.Region, *, logger=HERMES_LOGGER):
+def _execute_cell(view, region: sublime.Region, *, logger=HELIUM_LOGGER):
     try:
         kernel = ViewManager.get_kernel_for_view(view.buffer_id())
     except KeyError:
@@ -773,38 +773,38 @@ def _execute_cell(view, region: sublime.Region, *, logger=HERMES_LOGGER):
     logger.info(log_info_msg)
 
 
-class HermesExecuteBlock(TextCommand):
+class HeliumExecuteBlock(TextCommand):
     """Execute code."""
 
-    def is_enabled(self, *, logger=HERMES_LOGGER):
+    def is_enabled(self, *, logger=HELIUM_LOGGER):
         try:
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except KeyError:
             return False
-        return HermesKernelManager.get_kernel(kernel.kernel_id).is_alive()
+        return HeliumKernelManager.get_kernel(kernel.kernel_id).is_alive()
 
-    def is_visible(self, *, logger=HERMES_LOGGER):
+    def is_visible(self, *, logger=HELIUM_LOGGER):
         return self.is_enabled()
 
-    def run(self, edit, *, logger=HERMES_LOGGER):
+    def run(self, edit, *, logger=HELIUM_LOGGER):
         """Command definition."""
         _execute_block(self.view, logger=logger)
 
 
-class HermesExecuteCell(TextCommand):
+class HeliumExecuteCell(TextCommand):
     """Execute code cell."""
 
-    def is_enabled(self, *, logger=HERMES_LOGGER):
+    def is_enabled(self, *, logger=HELIUM_LOGGER):
         try:
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except KeyError:
             return False
         return kernel.is_alive()
 
-    def is_visible(self, *, logger=HERMES_LOGGER):
+    def is_visible(self, *, logger=HELIUM_LOGGER):
         return self.is_enabled()
 
-    def run(self, edit, move_cursor=False, *, logger=HERMES_LOGGER):
+    def run(self, edit, move_cursor=False, *, logger=HELIUM_LOGGER):
         """If move_cursor is true, move the cursor to the next cell after execution."""
         for s in self.view.sel():
             _execute_cell(self.view, s, logger=logger)
@@ -842,7 +842,7 @@ class StatusBar(object):
         self.update()
 
     def stop(self):
-        self.view.set_status("hermes_connected_kernel", "")
+        self.view.set_status("helium_connected_kernel", "")
 
     def update(self, pos=0):
         # `pos` can't be a property of `StatusBar` because it's not updated
@@ -854,7 +854,7 @@ class StatusBar(object):
         execution_state = self.kernel.execution_state
         if execution_state == "dead":
             # Stop when kernel is dead.
-            self.view.set_status("hermes_connected_kernel", "")
+            self.view.set_status("helium_connected_kernel", "")
             return
         elif execution_state == "busy":
             pos = pos % (2 * self.width)
@@ -871,32 +871,32 @@ class StatusBar(object):
             )
             + progress_bar
         )
-        self.view.set_status("hermes_connected_kernel", status)
+        self.view.set_status("helium_connected_kernel", status)
         sublime.set_timeout_async(lambda: self.update(pos + 1), self.interval)
 
 
-class HermesStatusUpdater(ViewEventListener):
+class HeliumStatusUpdater(ViewEventListener):
     """Listen to the heartbeat of kernel and update status of view."""
 
     def on_activated_async(self):
         sublime.set_timeout_async(lambda: StatusBar(self.view), 0)
 
 
-class HermesGetObjectInspection(TextCommand):
+class HeliumGetObjectInspection(TextCommand):
     """Get object inspection."""
 
-    def is_enabled(self, *, logger=HERMES_LOGGER):
+    def is_enabled(self, *, logger=HELIUM_LOGGER):
         try:
             kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
         except KeyError:
             return False
-        return HermesKernelManager.get_kernel(kernel.kernel_id).is_alive()
+        return HeliumKernelManager.get_kernel(kernel.kernel_id).is_alive()
 
-    def is_visible(self, *, logger=HERMES_LOGGER):
+    def is_visible(self, *, logger=HELIUM_LOGGER):
         return self.is_enabled()
 
     @chain_callbacks
-    def run(self, edit, *, logger=HERMES_LOGGER):
+    def run(self, edit, *, logger=HELIUM_LOGGER):
         view = self.view
         try:
             kernel = ViewManager.get_kernel_for_view(view.buffer_id())
@@ -922,15 +922,15 @@ class HermesGetObjectInspection(TextCommand):
             pre_code = code
 
 
-class HermesCompleter(EventListener):
+class HeliumCompleter(EventListener):
     """Completer."""
 
-    def on_query_completions(self, view, prefix, locations, *, logger=HERMES_LOGGER):
+    def on_query_completions(self, view, prefix, locations, *, logger=HELIUM_LOGGER):
         """Get completions from the Jupyter kernel."""
-        use_complete = sublime.load_settings("Hermes.sublime-settings").get("complete")
+        use_complete = sublime.load_settings("Helium.sublime-settings").get("complete")
         if not use_complete:
             return None
-        timeout = sublime.load_settings("Hermes.sublime-settings").get(
+        timeout = sublime.load_settings("Helium.sublime-settings").get(
             "complete_timeout"
         )
         try:
