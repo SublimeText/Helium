@@ -1,0 +1,26 @@
+{
+  "cell_delimiter_pattern": "^(#\\s?%%)|(# <codecell>)\\s*$",
+  // Regex pattern to find code cell blocks delimiters
+  // The default value hits the patterns below.
+  // #%%
+  // # %%
+  // # <codecell>
+  "complete": true,  // Whether use Helium' autocomplete powered by Jupyter kernel.
+  "complete_timeout": 0.5, // Timeout to get completion (in seconds).
+  "inline_output": false, // Set to true to show output in current view, like Jupyter
+  "ssh_servers": {
+  // List ssh servers.
+  // "server_name_shown_in_menu": { // You can use arbitary name here.
+  //   "server": "server_name",     // server name, required
+  //   "key": "/path/to/key/file"   // optional,
+  // }
+  //
+  // "server" can be a full `user@server:port` string.
+  // "key" is necessary unless ssh config does not associate
+  // a keyfile with the host.
+  }
+  // If you use kernels located in the directory other than default search path
+  // (see http://jupyter-client.readthedocs.io/en/stable/kernels.html#kernel-specs),
+  // set their path as below.
+  // "jupyter_path": "/path/to/kernel"
+}

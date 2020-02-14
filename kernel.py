@@ -36,18 +36,18 @@ MSG_TYPE_ERROR = "error"
 MSG_TYPE_STREAM = "stream"
 MSG_TYPE_STATUS = "status"
 
-HERMES_FIGURE_PHANTOMS = "hermes_figure_phantoms"
+HELIUM_FIGURE_PHANTOMS = "helium_figure_phantoms"
 
 # Used as key of status bar.
-KERNEL_STATUS_KEY = "hermes_kernel_status"
+KERNEL_STATUS_KEY = "helium_kernel_status"
 
-HERMES_OBJECT_INSPECT_PANEL = "hermes_object_inspect"
+HELIUM_OBJECT_INSPECT_PANEL = "helium_object_inspect"
 
 ANSI_ESCAPE_PATTERN = re.compile(r"\x1b[^m]*m")
 
 OUTPUT_VIEW_SEPARATOR = "-" * 80
 
-TEXT_PHANTOM = """<body id="hermes-result">
+TEXT_PHANTOM = """<body id="helium-result">
   <style>
     .stdout {{ color: color(var(--foreground) alpha(0.7)) }}
     .error {{ color: var(--redish) }}
@@ -58,7 +58,7 @@ TEXT_PHANTOM = """<body id="hermes-result">
   {content}
 </body>"""
 
-IMAGE_PHANTOM = """<body id="hermes-image-result" style="background-color:white">
+IMAGE_PHANTOM = """<body id="helium-image-result" style="background-color:white">
   <style>
     .image {{ background-color: white }}
     .closebutton {{ text-decoration: none }}
@@ -303,7 +303,7 @@ class KernelConnection(object):
     @property
     def view_name(self):
         """Return name of output view."""
-        return "*Hermes Output* {repr}".format(repr=self.repr)
+        return "*Helium Output* {repr}".format(repr=self.repr)
 
     @property
     def repr(self):
@@ -325,7 +325,7 @@ class KernelConnection(object):
 
     @property
     def _show_inline_output(self):
-        return sublime.load_settings("Hermes.sublime-settings").get("inline_output")
+        return sublime.load_settings("Helium.sublime-settings").get("inline_output")
 
     def activate_view(self):
         """Activate view to show the output of kernel."""
@@ -406,7 +406,7 @@ class KernelConnection(object):
         file_size = self.get_view().size()
         region = sublime.Region(file_size, file_size)
         self.get_view().add_phantom(
-            HERMES_FIGURE_PHANTOMS, region, content, sublime.LAYOUT_BLOCK
+            HELIUM_FIGURE_PHANTOMS, region, content, sublime.LAYOUT_BLOCK
         )
         self._logger.info("Created phantom {}".format(content))
 
@@ -414,7 +414,7 @@ class KernelConnection(object):
         self, content: str, region: sublime.Region, view: sublime.View
     ):
         if self._show_inline_output:
-            id = HERMES_FIGURE_PHANTOMS + datetime.now().isoformat()
+            id = HELIUM_FIGURE_PHANTOMS + datetime.now().isoformat()
             html = TEXT_PHANTOM.format(content=content)
             view.add_phantom(
                 id,
@@ -429,7 +429,7 @@ class KernelConnection(object):
         self, data: str, region: sublime.Region, view: sublime.View
     ):
         if self._show_inline_output:
-            id = HERMES_FIGURE_PHANTOMS + datetime.now().isoformat()
+            id = HELIUM_FIGURE_PHANTOMS + datetime.now().isoformat()
             html = IMAGE_PHANTOM.format(data=data)
             view.add_phantom(
                 id,
@@ -475,15 +475,15 @@ class KernelConnection(object):
 
     def _handle_inspect_reply(self, reply: dict):
         window = sublime.active_window()
-        if window.find_output_panel(HERMES_OBJECT_INSPECT_PANEL) is not None:
-            window.destroy_output_panel(HERMES_OBJECT_INSPECT_PANEL)
-        view = window.create_output_panel(HERMES_OBJECT_INSPECT_PANEL)
+        if window.find_output_panel(HELIUM_OBJECT_INSPECT_PANEL) is not None:
+            window.destroy_output_panel(HELIUM_OBJECT_INSPECT_PANEL)
+        view = window.create_output_panel(HELIUM_OBJECT_INSPECT_PANEL)
         try:
             self._logger.debug(reply)
             text = remove_ansi_escape(reply["text/plain"])
             view.run_command("append", {"characters": text})
             window.run_command(
-                "show_panel", {"panel": "output." + HERMES_OBJECT_INSPECT_PANEL}
+                "show_panel", {"panel": "output." + HELIUM_OBJECT_INSPECT_PANEL}
             )
 
         except KeyError as ex:
@@ -560,7 +560,7 @@ class KernelConnection(object):
             else:
                 # Just say the completion is came from this plugin, otherwise.
                 return [
-                    (match + "\tHermes", match) for match in recv_content["matches"]
+                    (match + "\tHelium", match) for match in recv_content["matches"]
                 ]
         except Empty:
             self._logger.info("Completion timeout.")
