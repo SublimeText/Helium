@@ -11,13 +11,12 @@ import os
 import re
 import uuid
 from functools import partial
-from logging import getLogger, INFO, StreamHandler
-
+from logging import INFO, StreamHandler, getLogger
 
 import sublime
-from sublime_plugin import TextCommand, EventListener, ViewEventListener
-from .lib.kernel import KernelConnection
+from sublime_plugin import EventListener, TextCommand, ViewEventListener
 
+from .lib.kernel import KernelConnection
 from .lib.utils import add_path, chain_callbacks
 
 with add_path(os.path.join(os.path.dirname(__file__), "lib/client")):
@@ -331,6 +330,7 @@ class HeliumStartKernel(TextCommand):
         _start_kernel(sublime.active_window(), self.view)
 
 
+# TODO: Make this an enum
 class ListKernelsSubcommands(object):
 
     connect = "Connect"
