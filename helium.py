@@ -14,6 +14,7 @@ from functools import partial
 from logging import INFO, StreamHandler, getLogger
 
 import sublime
+import sublime_lib
 from sublime_plugin import EventListener, TextCommand, ViewEventListener
 
 from .lib.kernel import KernelConnection
@@ -35,6 +36,8 @@ HANDLER.setLevel(INFO)
 if len(HELIUM_LOGGER.handlers) == 0:
     HELIUM_LOGGER.setLevel(INFO)
     HELIUM_LOGGER.addHandler(HANDLER)
+
+HELIUM_STATUS_KEY = "helium_connected_kernel"
 
 # Regex patterns to extract code lines.
 INDENT_PATTERN = re.compile(r"^([ \t]*)")
@@ -580,7 +583,7 @@ def _shutdown_kernel(window, view, *, continue_cb=lambda: None, logger=HELIUM_LO
         )
         logger.info(log_info_msg)
     ViewManager.remove_view(view.buffer_id())
-    view.set_status("helium_connected_kernel", "")
+    view.set_status(HELIUM_STATUS_KEY, "")
     continue_cb()
 
 
@@ -827,10 +830,9 @@ class StatusBar(object):
 
     def __init__(self, view, width=10, interval=500):
         self.view = view
-        self.width = width
         self.buffer_id = view.buffer_id()
-        self.interval = interval
-        self.pos = 0
+        self.indicator = sublime_lib.ActivityIndicator(self.view)
+
         try:
             self.kernel = ViewManager.get_kernel_for_view(self.buffer_id)
             self.start()
@@ -842,37 +844,28 @@ class StatusBar(object):
         self.update()
 
     def stop(self):
-        self.view.set_status("helium_connected_kernel", "")
+        self.view.set_status(HELIUM_STATUS_KEY, "")
 
-    def update(self, pos=0):
-        # `pos` can't be a property of `StatusBar` because it's not updated
+    def update(self, ticks=0):
+        # `ticks` can't be a property of `StatusBar` because it's not updated
         # when `update()` is called by `sublime.set_timeout[_async]()`.
         if self.buffer_id != sublime.active_window().active_view().buffer_id():
             # Stop when view is unfocused.
             self.stop()
             return
+
         execution_state = self.kernel.execution_state
         if execution_state == "dead":
             # Stop when kernel is dead.
-            self.view.set_status("helium_connected_kernel", "")
+            self.stop()
             return
-        elif execution_state == "busy":
-            pos = pos % (2 * self.width)
-            before = min(pos, (2 * self.width) - pos)
-            after = self.width - before
-            progress_bar = " [{}={}]".format(" " * before, " " * after)
-        else:
-            # Make progress bar always start with pos=0.
-            pos = -1
-            progress_bar = ""
-        status = (
-            "{repr} (state: {execution_state})".format(
-                repr=self.kernel.repr, execution_state=self.kernel.execution_state
-            )
-            + progress_bar
+
+        self.indicator.label = "{repr}: {execution_state}".format(
+            repr=self.kernel.repr, execution_state=self.kernel.execution_state
         )
-        self.view.set_status("helium_connected_kernel", status)
-        sublime.set_timeout_async(lambda: self.update(pos + 1), self.interval)
+        status = self.indicator.render(ticks)
+        self.view.set_status(HELIUM_STATUS_KEY, status)
+        sublime.set_timeout_async(lambda: self.update(ticks + 1), self.interval)
 
 
 class HeliumStatusUpdater(ViewEventListener):
