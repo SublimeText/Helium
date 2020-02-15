@@ -3,6 +3,7 @@
 default_stages: [push]
 default_language_version:
     python: python3.8
+exclude: "lib/client"
 
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
@@ -18,11 +19,15 @@ repos:
         args: [--branch, master]
 -   repo: local
     hooks:
+    -   id: black
+        name: black
+        entry: black
+        language: system
+        types: [python]
     -   id: flake8
         name: flake8
         description: Run flake8 and its plugins against all python files.
         entry: flake8
         language: system
         types: [python]
-        exclude: "lib/client"
         args: [--config, pyproject.toml]
