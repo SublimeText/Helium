@@ -4,7 +4,8 @@
 			"dateutil",
 			"enum",
 			"python-six",
-			"pyzmq"
+			"pyzmq",
+			"sublime_lib"
 		]
 	},
 	"osx": {
@@ -14,7 +15,8 @@
 			"pexpect",
 			"ptyprocess",
 			"python-six",
-			"pyzmq"
+			"pyzmq",
+			"sublime_lib"
 		]
 	},
 	"linux": {
@@ -24,7 +26,8 @@
 			"pexpect",
 			"ptyprocess",
 			"python-six",
-			"pyzmq"
+			"pyzmq",
+			"sublime_lib"
 		]
 	}
 }
