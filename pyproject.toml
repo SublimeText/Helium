@@ -5,7 +5,7 @@ description = "Let Sublime Text 3 talk with Jupyter."
 authors = ["Ben Felder <ben@felder.io>"]
 
 [tool.poetry.dependencies]
-python = "3.8"
+python = "^3.8"
 flake8-eradicate = "^0.2.4"
 pre-commit = "^2.0.1"
 
