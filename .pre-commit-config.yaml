@@ -26,8 +26,12 @@ repos:
         types: [python]
     -   id: flake8
         name: flake8
-        description: Run flake8 and its plugins against all python files.
         entry: flake8
         language: system
         types: [python]
         args: [--config, pyproject.toml]
+    -   id: isort
+        name: isort
+        entry: isort
+        language: system
+        types: [python]
