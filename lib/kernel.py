@@ -11,29 +11,29 @@ from queue import Empty, Queue
 from threading import Event, RLock, Thread
 
 import sublime
+from enum import Enum
 
 from .utils import show_password_input
 
 JUPYTER_PROTOCOL_VERSION = "5.0"
 
-REPLY_STATUS_OK = "ok"
-REPLY_STATUS_ERROR = "error"
-REPLY_STATUS_ABORT = "abort"
 
-MSG_TYPE_EXECUTE_INPUT = "execute_input"
-MSG_TYPE_EXECUTE_REQUEST = "execute_request"
-MSG_TYPE_EXECUTE_RESULT = "execute_result"
-MSG_TYPE_EXECUTE_REPLY = "execute_reply"
-MSG_TYPE_COMPLETE_REQUEST = "complete_request"
-MSG_TYPE_COMPLETE_REPLY = "complete_reply"
-MSG_TYPE_DISPLAY_DATA = "display_data"
-MSG_TYPE_INSPECT_REQUEST = "inspect_request"
-MSG_TYPE_INSPECT_REPLY = "inspect_reply"
-MSG_TYPE_INPUT_REQUEST = "input_request"
-MSG_TYPE_INPUT_REPLY = "input_reply"
-MSG_TYPE_ERROR = "error"
-MSG_TYPE_STREAM = "stream"
-MSG_TYPE_STATUS = "status"
+class MsgType(Enum):
+    EXECUTE_INPUT = "execute_input"
+    EXECUTE_REQUEST = "execute_request"
+    EXECUTE_RESULT = "execute_result"
+    EXECUTE_REPLY = "execute_reply"
+    COMPLETE_REQUEST = "complete_request"
+    COMPLETE_REPLY = "complete_reply"
+    DISPLAY_DATA = "display_data"
+    INSPECT_REQUEST = "inspect_request"
+    INSPECT_REPLY = "inspect_reply"
+    INPUT_REQUEST = "input_request"
+    INPUT_REPLY = "input_reply"
+    ERROR = "error"
+    STREAM = "stream"
+    STATUS = "status"
+
 
 HELIUM_FIGURE_PHANTOMS = "helium_figure_phantoms"
 
@@ -157,14 +157,14 @@ class KernelConnection(object):
                     view, region = self._kernel.id2region.get(
                         msg["parent_header"].get("msg_id", None), (None, None)
                     )
-                    if msg_type == MSG_TYPE_STATUS:
+                    if msg_type == MsgType.STATUS:
                         self._kernel._execution_state = content["execution_state"]
-                    elif msg_type == MSG_TYPE_EXECUTE_INPUT:
+                    elif msg_type == MsgType.EXECUTE_INPUT:
                         self._kernel._write_text_to_view("\n\n")
                         self._kernel._output_input_code(
                             content["code"], content["execution_count"]
                         )
-                    elif msg_type == MSG_TYPE_ERROR:
+                    elif msg_type == MsgType.ERROR:
                         self._kernel._logger.info("Handling error")
                         self._kernel._handle_error(
                             execution_count,
@@ -174,15 +174,15 @@ class KernelConnection(object):
                             region,
                             view,
                         )
-                    elif msg_type == MSG_TYPE_DISPLAY_DATA:
+                    elif msg_type == MsgType.DISPLAY_DATA:
                         self._kernel._write_mime_data_to_view(
                             content["data"], region, view
                         )
-                    elif msg_type == MSG_TYPE_EXECUTE_RESULT:
+                    elif msg_type == MsgType.EXECUTE_RESULT:
                         self._kernel._write_mime_data_to_view(
                             content["data"], region, view
                         )
-                    elif msg_type == MSG_TYPE_STREAM:
+                    elif msg_type == MsgType.STREAM:
                         self._kernel._handle_stream(
                             content["name"], content["text"], region, view,
                         )
@@ -215,7 +215,7 @@ class KernelConnection(object):
                     msg = self._kernel.client.get_stdin_msg(timeout=1)
                     msg_type = msg["msg_type"]
                     content = msg["content"]
-                    if msg_type == MSG_TYPE_INPUT_REQUEST:
+                    if msg_type == MsgType.INPUT_REQUEST:
                         self._handle_input_request(
                             content["prompt"], content["password"]
                         )
