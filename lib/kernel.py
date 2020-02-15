@@ -7,13 +7,12 @@ Copyright (c) 2017-2018, NEGORO Tetsuya (https://github.com/ngr-t)
 import re
 from collections import defaultdict
 from datetime import datetime
-from threading import Event, Thread, RLock
 from queue import Empty, Queue
+from threading import Event, RLock, Thread
 
 import sublime
 
 from .utils import show_password_input
-
 
 JUPYTER_PROTOCOL_VERSION = "5.0"
 
