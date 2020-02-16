@@ -14,6 +14,7 @@ import sublime
 from enum import Enum
 
 from .utils import show_password_input
+from .utils import get_png_dimensions
 
 JUPYTER_PROTOCOL_VERSION = "5.0"
 
@@ -59,12 +60,12 @@ TEXT_PHANTOM = """<body id="helium-result">
 
 IMAGE_PHANTOM = """<body id="helium-image-result" style="background-color:white">
   <style>
-    .image {{ background-color: white }}
+    .image {{ background-color: white; }}
     .closebutton {{ text-decoration: none }}
   </style>
   <a class=closebutton href=hide>×</a>
   <br>
-  <img class="image" alt="Out" src="data:image/png;base64,{data}" />
+  <img class="image" alt="Out" width="20" src="data:image/png;base64,{data}" />
 </body>"""
 
 STREAM_PHANTOM = "<div class={name}>{content}</div>"
@@ -464,11 +465,18 @@ class KernelConnection(object):
             data = mime_data["image/png"].strip()
             self._logger.info("Caught image.")
             self._logger.info("RELOADED -------------=================")
+
+            width = self.get_view().viewport_extent()[0] - 2
+            dimensions = get_png_dimensions(data)
+
+            scale_factor = width / dimensions[0]
+            height = dimensions[1] * scale_factor
+
             content = (
                 '<body style="background-color:white">'
-                + '<img alt="Out" src="data:image/png;base64,{data}" />'
+                '<img alt="Out" style="width: {width}; height: {height}" src="data:image/png;base64,{data}" />'
                 + "</body>"
-            ).format(data=data, bgcolor="white")
+            ).format(data=data, width=width, height=height, bgcolor="white")
             self._write_phantom(content)
             self._write_inline_image_phantom(data, region, view)
 
