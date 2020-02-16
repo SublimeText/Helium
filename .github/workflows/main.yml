@@ -9,4 +9,4 @@ jobs:
 
     steps:
     - name: GitHub Action UnitTesting TryOut
-      uses: pykong/st3_unittesting_action@1.0.0
+      uses: pykong/st3_unittesting_action@1.0.3
