@@ -3,6 +3,14 @@ name = "Helium"
 version = "0.6.0"
 description = "Let Sublime Text 3 talk with Jupyter."
 authors = ["Ben Felder <ben@felder.io>"]
+repository = "https://github.com/pykong/Helium"
+readme = "README.md"
+keywords = ["sublime-text-3", "jupyter"]
+license = "GPL-2.0-only"
+exclude = []
+
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/pykong/Helium/issues"
 
 [tool.poetry.dependencies]
 python = "^3.8"
