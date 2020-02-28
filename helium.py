@@ -17,7 +17,7 @@ import sublime
 import sublime_lib
 from sublime_plugin import EventListener, TextCommand, ViewEventListener
 
-from .lib.kernel import KernelConnection
+from .lib.kernel import KernelConnection, ExecState
 from .lib.utils import add_path, chain_callbacks
 
 with add_path(os.path.join(os.path.dirname(__file__), "lib/client")):
@@ -857,18 +857,17 @@ class StatusBar(object):
 
         execution_state = self.kernel.execution_state
 
-        # TODO: Rethink which state should be terminating
-        if execution_state in ("dead", "idle"):
-            # Stop when kernel is dead/idle.
+        if execution_state is ExecState.BUSY:
+            self.indicator.label = "{repr}: {execution_state}".format(
+                repr=self.kernel.repr, execution_state=self.kernel.execution_state
+            )
+            status = self.indicator.render(ticks)
+            self.view.set_status(HELIUM_STATUS_KEY, status)
+            sublime.set_timeout_async(lambda: self.update(ticks + 1), self.interval)
+        else:
+            # Stop when kernel is not busy anymore.
             self.stop()
             return
-
-        self.indicator.label = "{repr}: {execution_state}".format(
-            repr=self.kernel.repr, execution_state=self.kernel.execution_state
-        )
-        status = self.indicator.render(ticks)
-        self.view.set_status(HELIUM_STATUS_KEY, status)
-        sublime.set_timeout_async(lambda: self.update(ticks + 1), self.interval)
 
 
 class HeliumStatusUpdater(ViewEventListener):

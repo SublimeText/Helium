@@ -11,7 +11,7 @@ from queue import Empty, Queue
 from threading import Event, RLock, Thread
 
 import sublime
-from enum import Enum
+from enum import Enum, auto
 
 from .utils import show_password_input
 
@@ -34,6 +34,18 @@ class MsgType(Enum):
     STREAM = "stream"
     STATUS = "status"
     UNKNOWN = "unknown"
+
+
+class ExecState(Enum):
+    """Representation of execution states.
+
+    https://jupyter-client.readthedocs.io/en/stable/messaging.html#kernel-status
+    """
+
+    BUSY = auto()
+    IDLE = auto()
+    STARTING = auto()
+    UNKNOWN = auto()
 
 
 HELIUM_FIGURE_PHANTOMS = "helium_figure_phantoms"
@@ -165,7 +177,8 @@ class KernelConnection(object):
 
                     self._kernel._logger.info(msg_type)
                     if msg_type is MsgType.STATUS:
-                        self._kernel._execution_state = content["execution_state"]
+                        state = ExecState[content["execution_state"].upper()]
+                        self._kernel._execution_state = state
                     elif msg_type is MsgType.EXECUTE_INPUT:
                         self._kernel._write_text_to_view("\n\n")
                         self._kernel._output_input_code(
@@ -260,7 +273,7 @@ class KernelConnection(object):
         self.shell_msg_queues_lock = RLock()
         self.id2region = {}
         self._connection_name = connection_name
-        self._execution_state = "unknown"
+        self._execution_state = ExecState.UNKNOWN
         self._init_receivers()
 
     def __del__(self):  # noqa
@@ -326,7 +339,7 @@ class KernelConnection(object):
             )
 
     @property
-    def execution_state(self):
+    def execution_state(self) -> ExecState:
         return self._execution_state
 
     @property
@@ -535,7 +548,7 @@ class KernelConnection(object):
 
     def get_complete(self, code, cursor_pos, timeout=None):
         """Generate complete request."""
-        if self.execution_state != "idle":
+        if self.execution_state is not ExecState.IDLE:
             return []
         msg_id = self.client.complete(code, cursor_pos)
         self.shell_msg_queues_lock.acquire()
