@@ -832,6 +832,7 @@ class StatusBar(object):
         self.view = view
         self.buffer_id = view.buffer_id()
         self.indicator = sublime_lib.ActivityIndicator(self.view)
+        self.interval = interval
 
         try:
             self.kernel = ViewManager.get_kernel_for_view(self.buffer_id)
