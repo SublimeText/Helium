@@ -33,6 +33,7 @@ class MsgType(Enum):
     ERROR = "error"
     STREAM = "stream"
     STATUS = "status"
+    UNKNOWN = "unknown"
 
 
 HELIUM_FIGURE_PHANTOMS = "helium_figure_phantoms"
@@ -153,18 +154,24 @@ class KernelConnection(object):
                     self._kernel._logger.info(msg)
                     content = msg.get("content", {})
                     execution_count = content.get("execution_count", None)
-                    msg_type = msg["msg_type"]
+                    try:
+                        msg_type = MsgType[msg["msg_type"].upper()]
+                    except KeyError:
+                        msg_type = MsgType.UNKNOWN
+
                     view, region = self._kernel.id2region.get(
                         msg["parent_header"].get("msg_id", None), (None, None)
                     )
-                    if msg_type == MsgType.STATUS:
+
+                    self._kernel._logger.info(msg_type)
+                    if msg_type is MsgType.STATUS:
                         self._kernel._execution_state = content["execution_state"]
-                    elif msg_type == MsgType.EXECUTE_INPUT:
+                    elif msg_type is MsgType.EXECUTE_INPUT:
                         self._kernel._write_text_to_view("\n\n")
                         self._kernel._output_input_code(
                             content["code"], content["execution_count"]
                         )
-                    elif msg_type == MsgType.ERROR:
+                    elif msg_type is MsgType.ERROR:
                         self._kernel._logger.info("Handling error")
                         self._kernel._handle_error(
                             execution_count,
@@ -174,15 +181,15 @@ class KernelConnection(object):
                             region,
                             view,
                         )
-                    elif msg_type == MsgType.DISPLAY_DATA:
+                    elif msg_type is MsgType.DISPLAY_DATA:
                         self._kernel._write_mime_data_to_view(
                             content["data"], region, view
                         )
-                    elif msg_type == MsgType.EXECUTE_RESULT:
+                    elif msg_type is MsgType.EXECUTE_RESULT:
                         self._kernel._write_mime_data_to_view(
                             content["data"], region, view
                         )
-                    elif msg_type == MsgType.STREAM:
+                    elif msg_type is MsgType.STREAM:
                         self._kernel._handle_stream(
                             content["name"], content["text"], region, view,
                         )

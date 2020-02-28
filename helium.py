@@ -856,8 +856,10 @@ class StatusBar(object):
             return
 
         execution_state = self.kernel.execution_state
-        if execution_state == "dead":
-            # Stop when kernel is dead.
+
+        # TODO: Rethink which state should be terminating
+        if execution_state in ("dead", "idle"):
+            # Stop when kernel is dead/idle.
             self.stop()
             return
 
