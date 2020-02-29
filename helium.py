@@ -12,6 +12,7 @@ import re
 import uuid
 from functools import partial
 from logging import INFO, StreamHandler, getLogger
+from enum import Enum, unique
 
 import sublime
 import sublime_lib
@@ -333,45 +334,37 @@ class HeliumStartKernel(TextCommand):
         _start_kernel(sublime.active_window(), self.view)
 
 
-# TODO: Make this an enum
-class ListKernelsSubcommands(object):
+@unique
+class KernelSubcommand(Enum):
 
-    connect = "Connect"
-    rename = "Rename"
-    interrupt = "Interrupt"
-    restart = "Restart"
-    shutdown = "Shutdown"
-    back = "Back to the kernel list"
+    CONNECT = "Connect"
+    RENAME = "Rename"
+    INTERRUPT = "Interrupt"
+    RESTART = "Restart"
+    SHUTDOWN = "Shutdown"
+    BACK = "Back to the kernel list"
 
 
 @chain_callbacks
 def _list_kernels(window, view, *, logger=HELIUM_LOGGER):
-    sc = ListKernelsSubcommands
+
     selected_kernel = yield partial(
         _show_kernel_selection_menu, window, view, add_new=True
     )
-    subcommands = [
-        sc.connect,
-        sc.rename,
-        sc.interrupt,
-        sc.restart,
-        sc.shutdown,
-        sc.back,
-    ]
+    subcommands = list(KernelSubcommand)
     try:
-        if (
-            selected_kernel["id"]
-            == ViewManager.get_kernel_for_view(view.buffer_id()).kernel_id
-        ):
-            subcommands = [sc.rename, sc.interrupt, sc.restart, sc.shutdown, sc.back]
+        ViewManager.get_kernel_for_view(view.buffer_id())
     except KeyError:
-        # No kernel is connected
-        # `subcommands` includes "Connect"
         pass
+    else:
+        # if view has connected kernel, do not show connect kernel command
+        subcommands = [sc for sc in subcommands if sc is not KernelSubcommand.CONNECT]
+
     index = yield partial(window.show_quick_panel, subcommands)
     if index == -1:
         return
-    elif subcommands[index] is sc.connect:
+    choice = list(subcommands)[index]
+    if choice is KernelSubcommand.CONNECT:
         # Connect
         ViewManager.connect_kernel(
             view.buffer_id(), selected_kernel["name"], selected_kernel["id"]
@@ -388,7 +381,7 @@ def _list_kernels(window, view, *, logger=HELIUM_LOGGER):
             kernel_id=selected_kernel["id"],
         )
         logger.info(log_info_msg)
-    elif subcommands[index] is sc.rename:
+    elif choice is KernelSubcommand.RENAME:
         # Rename
         conn = HeliumKernelManager.get_kernel(selected_kernel["id"])
         curr_name = conn.connection_name if conn.connection_name is not None else ""
@@ -400,28 +393,28 @@ def _list_kernels(window, view, *, logger=HELIUM_LOGGER):
             on_cancel=None,
         )
         conn.connection_name = new_name
-    elif subcommands[index] is sc.interrupt:
+    elif choice is KernelSubcommand.INTERRUPT:
         # Interrupt
         HeliumKernelManager.interrupt_kernel(selected_kernel["id"])
         log_info_msg = ("Interrupted kernel {kernel_id}.").format(
             kernel_id=selected_kernel["id"]
         )
         logger.info(log_info_msg)
-    elif subcommands[index] is sc.restart:
+    elif choice is KernelSubcommand.RESTART:
         # Restart
         HeliumKernelManager.restart_kernel(selected_kernel["id"])
         log_info_msg = ("Restarted kernel {kernel_id}.").format(
             kernel_id=selected_kernel["id"]
         )
         logger.info(log_info_msg)
-    elif subcommands[index] is sc.shutdown:
+    elif choice is KernelSubcommand.SHUTDOWN:
         # Shutdown
         HeliumKernelManager.shutdown_kernel(selected_kernel["id"])
         log_info_msg = ("Shutdown kernel {kernel_id}.").format(
             kernel_id=selected_kernel["id"]
         )
         logger.info(log_info_msg)
-    elif subcommands[index] is sc.back:
+    elif choice is KernelSubcommand.BACK:
         # Back to the kernel list
         yield _list_kernels(window, view)
     sublime.set_timeout_async(lambda: StatusBar(view), 0)
