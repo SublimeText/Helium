@@ -203,7 +203,7 @@ class KernelConnection(object):
                             content["evalue"],
                             content["traceback"],
                             region,
-                            view,
+                            view
                         )
                     elif msg_type is MsgType.DISPLAY_DATA:
                         self._kernel._write_mime_data_to_view(
@@ -392,7 +392,7 @@ class KernelConnection(object):
                 execution_count=execution_count,
                 ename=ename,
                 evalue=evalue,
-                traceback="\n".join(traceback),
+                traceback="\n".join(traceback)
             )
             lines = remove_ansi_escape(lines)
             self._write_text_to_view(lines)

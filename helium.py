@@ -226,7 +226,7 @@ def _enter_connection_info(
         "Enter connection info or the path to connection file.",
         "",
         on_change=None,
-        on_cancel=None,
+        on_cancel=None
     )
     try:
         continue_cb(json.loads(connection_info_str))
@@ -299,7 +299,7 @@ def _start_kernel(
             "shell_port": shell_port,
             "iopub_port": iopub_port,
             "stdin_port": stdin_port,
-            "hb_port": hb_port,
+            "hb_port": hb_port
         }
         connection_info.update(new_ports)
         connection_name = yield partial(
@@ -396,7 +396,7 @@ def _list_kernels(window: sublime.Window, view: sublime.View, *, logger=HELIUM_L
         ).format(
             view_name=view_name,
             buffer_id=view.buffer_id(),
-            kernel_id=selected_kernel["id"],
+            kernel_id=selected_kernel["id"]
         )
         logger.info(log_info_msg)
     elif choice is KernelPaletteCommand.RENAME:
@@ -408,7 +408,7 @@ def _list_kernels(window: sublime.Window, view: sublime.View, *, logger=HELIUM_L
             "New name",
             curr_name,
             on_change=None,
-            on_cancel=None,
+            on_cancel=None
         )
         conn.connection_name = new_name
     elif choice is KernelPaletteCommand.INTERRUPT:
@@ -483,7 +483,7 @@ def _connect_kernel(
         ).format(
             view_name=view_name,
             buffer_id=view.buffer_id(),
-            kernel_id=selected_kernel["id"],
+            kernel_id=selected_kernel["id"]
         )
         logger.info(log_info_msg)
     sublime.set_timeout_async(lambda: StatusBar(view), 0)
@@ -697,7 +697,7 @@ def update_run_cell_phantoms(view: sublime.View, *, logger=HELIUM_LOGGER):
             sublime.LAYOUT_INLINE,
             on_navigate=lambda href, view=view, region=code_region: _execute_cell(
                 view, region
-            ),
+            )
         )
 
 
