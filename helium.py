@@ -704,7 +704,8 @@ def get_line(view: sublime.View, row: int) -> str:
 
 def get_indent(view: sublime.View, row: int) -> str:
     line = get_line(view, row)
-    return INDENT_PATTERN.match(line).group()
+    # TODO: Fix this, it will raise if not matching
+    return INDENT_PATTERN.match(line).group()  # type: ignore
 
 
 def get_block(view: sublime.View, s: sublime.Region) -> Tuple[str, sublime.Region]:
@@ -778,7 +779,7 @@ def _execute_block(view: sublime.View, *, logger=HELIUM_LOGGER) -> Generator:
         yield lambda cb: _connect_kernel(sublime.active_window(), view, continue_cb=cb)
         kernel = ViewManager.get_kernel_for_view(view.buffer_id())
 
-    pre_code = []
+    pre_code = ""
     for s in view.sel():
         code, region = get_block(view, s)
         if code == pre_code:
