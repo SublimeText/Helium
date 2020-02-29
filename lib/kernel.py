@@ -9,7 +9,7 @@ from collections import defaultdict
 from datetime import datetime
 from queue import Empty, Queue
 from threading import Event, RLock, Thread
-from typing import List, Optional
+from typing import DefaultDict, Dict, List, Optional, Tuple
 from uuid import UUID
 
 import sublime
@@ -512,7 +512,7 @@ class KernelConnection(object):
             self._write_phantom(content)
             self._write_inline_image_phantom(data, region, view)
 
-    def _handle_inspect_reply(self, reply: dict) -> None:
+    def _handle_inspect_reply(self, reply: Dict[str, str]) -> None:
         window = sublime.active_window()
         if window.find_output_panel(HELIUM_OBJECT_INSPECT_PANEL) is not None:
             window.destroy_output_panel(HELIUM_OBJECT_INSPECT_PANEL)
@@ -570,7 +570,7 @@ class KernelConnection(object):
 
     def get_complete(
         self, code: str, cursor_pos: int, timeout: Optional[int] = None
-    ) -> List[str]:
+    ) -> List[Tuple[str, str]]:
         """Generate complete request."""
         if self.execution_state is not ExecState.IDLE:
             return []
