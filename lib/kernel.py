@@ -9,7 +9,7 @@ from collections import defaultdict
 from datetime import datetime
 from queue import Empty, Queue
 from threading import Event, RLock, Thread
-from typing import DefaultDict, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
 import sublime
@@ -225,7 +225,8 @@ class KernelConnection(object):
     class StdInMessageReceiver(MessageReceiver):
         """Receive and process IOPub messages."""
 
-        def _handle_input_request(self, prompt: str, password: str):  # type: (...) -> None
+        def _handle_input_request(self, prompt: str, password: str):
+            # type: (...) -> None
             def interrupt():
                 self._kernel.interrupt_kernel(self.kernel_id)
 
@@ -371,7 +372,8 @@ class KernelConnection(object):
         view.settings().set("word_wrap", "false")
         sublime.active_window().focus_view(current_view)
 
-    def _output_input_code(self, code: str, execution_count: int):  # type: (...) -> None
+    def _output_input_code(self, code: str, execution_count: int):
+        # type: (...) -> None
         line = "In[{execution_count}]: {code}".format(
             execution_count=execution_count, code=code
         )
