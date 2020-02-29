@@ -23,3 +23,5 @@ jobs:
     - name: Run pre-commit
       run: |
         poetry run pre-commit run --hook-stage push
+    - name: Run mypy
+        poetry run mypy --ignore-missing-imports .
