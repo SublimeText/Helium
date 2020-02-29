@@ -18,23 +18,26 @@ from .utils import show_password_input
 JUPYTER_PROTOCOL_VERSION = "5.0"
 
 
+@unique
 class MsgType(Enum):
-    EXECUTE_INPUT = "execute_input"
-    EXECUTE_REQUEST = "execute_request"
-    EXECUTE_RESULT = "execute_result"
-    EXECUTE_REPLY = "execute_reply"
-    COMPLETE_REQUEST = "complete_request"
-    COMPLETE_REPLY = "complete_reply"
-    DISPLAY_DATA = "display_data"
-    INSPECT_REQUEST = "inspect_request"
-    INSPECT_REPLY = "inspect_reply"
-    INPUT_REQUEST = "input_request"
-    INPUT_REPLY = "input_reply"
-    ERROR = "error"
-    STREAM = "stream"
-    STATUS = "status"
-    UNKNOWN = "unknown"
+    """Representation of Message type."""
 
+    # TODO: use auto, once on ST4
+    EXECUTE_INPUT = 0
+    EXECUTE_REQUEST = 1
+    EXECUTE_RESULT = 2
+    EXECUTE_REPLY = 3
+    COMPLETE_REQUEST = 4
+    COMPLETE_REPLY = 5
+    DISPLAY_DATA = 6
+    INSPECT_REQUEST = 7
+    INSPECT_REPLY = 8
+    INPUT_REQUEST = 9
+    INPUT_REPLY = 10
+    ERROR = 11
+    STREAM = 12
+    STATUS = 13
+    UNKNOWN = 14
 
 
 @unique
