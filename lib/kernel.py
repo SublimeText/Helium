@@ -14,6 +14,7 @@ import sublime
 from enum import Enum, unique
 
 from .utils import show_password_input
+from .utils import get_png_dimensions
 
 JUPYTER_PROTOCOL_VERSION = "5.0"
 
@@ -79,7 +80,7 @@ TEXT_PHANTOM = """<body id="helium-result">
 
 IMAGE_PHANTOM = """<body id="helium-image-result" style="background-color:white">
   <style>
-    .image {{ background-color: white }}
+    .image {{ background-color: white; }}
     .closebutton {{ text-decoration: none }}
   </style>
   <a class=closebutton href=hide>×</a>
@@ -456,7 +457,8 @@ class KernelConnection(object):
     ):
         if self._show_inline_output:
             id = HELIUM_FIGURE_PHANTOMS + datetime.now().isoformat()
-            html = IMAGE_PHANTOM.format(data=data)
+            width = view.viewport_extent()[0]
+            html = IMAGE_PHANTOM.format(data=data, width=width)
             view.add_phantom(
                 id,
                 region,
@@ -491,11 +493,20 @@ class KernelConnection(object):
             data = mime_data["image/png"].strip()
             self._logger.info("Caught image.")
             self._logger.info("RELOADED -------------=================")
+
+            self._logger.info(self.get_view().viewport_extent())
+
+            width = self.get_view().viewport_extent()[0] - 2
+            dimensions = get_png_dimensions(data)
+
+            scale_factor = width / dimensions[0]
+            height = dimensions[1] * scale_factor
+
             content = (
                 '<body style="background-color:white">'
-                + '<img alt="Out" src="data:image/png;base64,{data}" />'
+                '<img alt="Out" style="width: {width}; height: {height}" src="data:image/png;base64,{data}" />'
                 + "</body>"
-            ).format(data=data, bgcolor="white")
+            ).format(data=data, width=width, height=height, bgcolor="white")
             self._write_phantom(content)
             self._write_inline_image_phantom(data, region, view)
 
