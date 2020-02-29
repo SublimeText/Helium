@@ -25,7 +25,7 @@ jobs:
         poetry run pre-commit run --hook-stage push
     - name: Run mypy
       run: |
-        poetry run mypy --ignore-missing-imports .
+        poetry run mypy --ignore-missing-imports helium.py ./lib/*.py
 
   test_linux:
     runs-on: ubuntu-latest
