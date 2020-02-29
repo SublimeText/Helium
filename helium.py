@@ -113,7 +113,7 @@ class ViewManager(object):
         return cls.kernel_by_buffer_id[buffer_id]
 
 
-class HeliumKernelManager(object):
+class HeliumKernelManager(object):  # TODO: Rename to just KernelManager
     """Manage Jupyter kernels."""
 
     # The key is a tuple consisted of the name of kernelspec and kernel ID,
