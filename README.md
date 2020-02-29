@@ -1,4 +1,5 @@
 [![codecov](https://codecov.io/gh/pykong/Helium/branch/master/graph/badge.svg)](https://codecov.io/gh/pykong/Helium)
+![](https://github.com/pykong/Helium/workflows/CI/badge.svg)
 
 Helium package for Sublime Text 3
 ===
