@@ -92,7 +92,7 @@ IMAGE_PHANTOM = """<body id="helium-image-result" style="background-color:white"
 STREAM_PHANTOM = "<div class={name}>{content}</div>"
 
 
-def fix_whitespace_for_phantom(text: str) -> str:
+def fix_whitespace_for_phantom(text: str):  # type: (...) -> str
     """Transform output for proper display.
 
     This is important to display pandas DataFrames, for instance.
@@ -102,7 +102,7 @@ def fix_whitespace_for_phantom(text: str) -> str:
     return text
 
 
-def extract_content(messages, msg_type: MsgType) -> List[str]:
+def extract_content(messages, msg_type: MsgType):  # type: (...) -> List[str]
     """Extract content from messages received from a kernel."""
     return [
         message["content"]
@@ -112,7 +112,7 @@ def extract_content(messages, msg_type: MsgType) -> List[str]:
     ]
 
 
-def remove_ansi_escape(text: str) -> str:
+def remove_ansi_escape(text: str):  # type: (...) -> str
     return ANSI_ESCAPE_PATTERN.sub("", text)
 
 
@@ -121,7 +121,7 @@ def get_msg_type(message):
     return message["header"]["msg_type"]
 
 
-def extract_data(result) -> str:
+def extract_data(result):  # type: (...) -> str
     """Extract plain text data."""
     try:
         return result["data"]
@@ -133,19 +133,19 @@ class KernelConnection(object):
     """Interact with a Jupyter kernel."""
 
     class MessageReceiver(Thread):  # noqa
-        def __init__(self, kernel) -> None:
+        def __init__(self, kernel):  # type: (...) -> None
             """Initialize AsyncCommunicator class."""
             super().__init__()
             self._kernel = kernel
             self.exit = Event()
 
-        def shutdown(self) -> None:
+        def shutdown(self):  # type: (...) -> None
             self.exit.set()
 
     class ShellMessageReceiver(MessageReceiver):
         """Communicator that runs asynchroniously."""
 
-        def run(self) -> None:
+        def run(self):  # type: (...) -> None
             """Run main routine."""
             # TODO: implement logging
             # TODO: remove view and regions from id2region
@@ -168,7 +168,7 @@ class KernelConnection(object):
     class IOPubMessageReceiver(MessageReceiver):
         """Receive and process IOPub messages."""
 
-        def run(self) -> None:
+        def run(self):  # type: (...) -> None
             """Run main routine."""
             # TODO: log, handle other message types.
             while not self.exit.is_set():
@@ -225,7 +225,7 @@ class KernelConnection(object):
     class StdInMessageReceiver(MessageReceiver):
         """Receive and process IOPub messages."""
 
-        def _handle_input_request(self, prompt: str, password: str) -> None:
+        def _handle_input_request(self, prompt: str, password: str):  # type: (...) -> None
             def interrupt():
                 self._kernel.interrupt_kernel(self.kernel_id)
 
@@ -238,7 +238,7 @@ class KernelConnection(object):
                     )
                 )
 
-        def run(self) -> None:
+        def run(self):  # type: (...) -> None
             """Run main routine."""
             # TODO: log, handle other message types.
             while not self.exit.is_set():
@@ -255,7 +255,7 @@ class KernelConnection(object):
                 except Exception as ex:
                     self._kernel._logger.exception(ex)
 
-    def _init_receivers(self) -> None:
+    def _init_receivers(self):  # type: (...) -> None
         # Set the attributes refered by receivers before they start.
         self._shell_msg_receiver = self.ShellMessageReceiver(self)
         self._shell_msg_receiver.start()
@@ -270,7 +270,7 @@ class KernelConnection(object):
         kernel_manager,  # TODO: This might be KernelManager,
         parent,
         connection_name=None,
-        logger=None,
+        logger=None
     ):
         """Initialize KernelConnection class.
 
@@ -280,7 +280,7 @@ class KernelConnection(object):
         parent parent kernel manager
         """
         self._logger = logger
-        self.shell_msg_queues = defaultdict(Queue)
+        self.shell_msg_queues = defaultdict(Queue)  # tpye: DefaultDict
         self._kernel_id = kernel_id
         self.parent = parent
         self.kernel_manager = kernel_manager
@@ -303,51 +303,51 @@ class KernelConnection(object):
         return self.kernel_manager.kernel_name
 
     @property
-    def kernel_id(self) -> UUID:
+    def kernel_id(self):  # type: (...) -> UUID
         """ID of kernel."""
         return self._kernel_id
 
-    def shutdown_kernel(self) -> None:
+    def shutdown_kernel(self):  # type: (...) -> None
         self.kernel_manager.shutdown_kernel()
 
-    def restart_kernel(self) -> None:
+    def restart_kernel(self):  # type: (...) -> None
         self.kernel_manager.restart_kernel()
 
-    def interrupt_kernel(self) -> None:
+    def interrupt_kernel(self):  # type: (...) -> None
         self.kernel_manager.interrupt_kernel()
 
-    def get_connection_name(self) -> str:
+    def get_connection_name(self):  # type: (...) -> str
         return self._connection_name
 
-    def set_connection_name(self, new_name: str) -> None:
+    def set_connection_name(self, new_name: str):  # type: (...) -> None
         # We also have to change the view name now.
         view = self.get_view()
         self._connection_name = new_name
         view.set_name(self.view_name)
 
-    def del_connection_name(self) -> None:
+    def del_connection_name(self):  # type: (...) -> None
         self._connection_name = None
 
     connection_name = property(
         get_connection_name,
         set_connection_name,
         del_connection_name,
-        "Name of kernel connection shown in a view title.",
+        "Name of kernel connection shown in a view title."
     )
 
     @property
-    def view_name(self) -> str:
+    def view_name(self):  # type: (...) -> str
         """Return name of output view."""
         return "*Helium Output* {repr}".format(repr=self.repr)
 
     @property
-    def repr(self) -> str:
+    def repr(self):  # type: (...) -> str
         """Return string representation of the connection."""
         if self.connection_name:
             return "{connection_name} ([{lang}] {kernel_id})".format(
                 connection_name=self.connection_name,
                 lang=self.lang,
-                kernel_id=self.kernel_id,
+                kernel_id=self.kernel_id
             )
         else:
             return "[{lang}] {kernel_id}".format(
@@ -355,14 +355,14 @@ class KernelConnection(object):
             )
 
     @property
-    def execution_state(self) -> ExecState:
+    def execution_state(self):  # type: (...) -> ExecState
         return self._execution_state
 
     @property
-    def _show_inline_output(self) -> bool:  # TODO: Rename to _should..
+    def _show_inline_output(self):  # type: (...) -> bool  # TODO: Rename to _should..
         return sublime.load_settings("Helium.sublime-settings").get("inline_output")
 
-    def activate_view(self) -> None:
+    def activate_view(self):  # type: (...) -> None
         """Activate view to show the output of kernel."""
         view = self.get_view()
         current_view = sublime.active_window().active_view()
@@ -371,7 +371,7 @@ class KernelConnection(object):
         view.settings().set("word_wrap", "false")
         sublime.active_window().focus_view(current_view)
 
-    def _output_input_code(self, code: str, execution_count: int) -> None:
+    def _output_input_code(self, code: str, execution_count: int):  # type: (...) -> None
         line = "In[{execution_count}]: {code}".format(
             execution_count=execution_count, code=code
         )
@@ -384,8 +384,8 @@ class KernelConnection(object):
         evalue: str,
         traceback: str,
         region: sublime.Region = None,
-        view: sublime.View = None,
-    ) -> None:
+        view: sublime.View = None
+    ):  # type: (...) -> None
         try:
             lines = "\nError[{execution_count}]: {ename}, {evalue}."
             "\nTraceback:\n{traceback}".format(
@@ -410,8 +410,8 @@ class KernelConnection(object):
         name: str,
         text: str,
         region: sublime.Region = None,
-        view: sublime.View = None,
-    ) -> None:
+        view: sublime.View = None
+    ):  # type: (...) -> None
         # Currently don't consider real time catching of streams.
         try:
             lines = "\n({name}):\n{text}".format(name=name, text=text)
@@ -425,10 +425,10 @@ class KernelConnection(object):
             # Just there is no error.
             pass
 
-    def _write_out_execution_count(self, execution_count: int) -> None:
+    def _write_out_execution_count(self, execution_count: int):  # type: (...) -> None
         self._write_text_to_view("\nOut[{}]: ".format(execution_count))
 
-    def _write_text_to_view(self, text: str) -> None:
+    def _write_text_to_view(self, text: str):  # type: (...) -> None
         if self._show_inline_output:
             return
         self.activate_view()
@@ -438,7 +438,7 @@ class KernelConnection(object):
         view.set_read_only(True)
         view.show(view.size())
 
-    def _write_phantom(self, content: str) -> None:
+    def _write_phantom(self, content: str):  # type: (...) -> None
         if self._show_inline_output:
             return
         self.activate_view()
@@ -451,7 +451,7 @@ class KernelConnection(object):
 
     def _write_inline_html_phantom(
         self, content: str, region: sublime.Region, view: sublime.View
-    ) -> None:
+    ):  # type: (...) -> None
         if self._show_inline_output:
             id = HELIUM_FIGURE_PHANTOMS + datetime.now().isoformat()
             html = TEXT_PHANTOM.format(content=content)
@@ -466,7 +466,7 @@ class KernelConnection(object):
 
     def _write_inline_image_phantom(
         self, data: str, region: sublime.Region, view: sublime.View
-    ) -> None:
+    ):  # type: (...) -> None
         if self._show_inline_output:
             id = HELIUM_FIGURE_PHANTOMS + datetime.now().isoformat()
             html = IMAGE_PHANTOM.format(data=data)
@@ -481,7 +481,7 @@ class KernelConnection(object):
 
     def _write_mime_data_to_view(
         self, mime_data: dict, region: sublime.Region, view: sublime.View
-    ) -> None:
+    ):  # type: (...) -> None
         # Now we use basically text/plain for text type.
         # Jupyter kernels often emits html whom minihtml cannot render.
         if "text/plain" in mime_data:
@@ -512,7 +512,7 @@ class KernelConnection(object):
             self._write_phantom(content)
             self._write_inline_image_phantom(data, region, view)
 
-    def _handle_inspect_reply(self, reply: Dict[str, str]) -> None:
+    def _handle_inspect_reply(self, reply: Dict[str, str]):  # type: (...) -> None
         window = sublime.active_window()
         if window.find_output_panel(HELIUM_OBJECT_INSPECT_PANEL) is not None:
             window.destroy_output_panel(HELIUM_OBJECT_INSPECT_PANEL)
@@ -528,7 +528,7 @@ class KernelConnection(object):
         except KeyError as ex:
             self._logger.exception(ex)
 
-    def get_view(self) -> sublime.View:
+    def get_view(self):  # type: (...) -> sublime.View
         """Get view corresponds to the KernelConnection."""
         view = None
         view_name = self.view_name
@@ -554,7 +554,7 @@ class KernelConnection(object):
 
     def execute_code(
         self, code: str, phantom_region: sublime.Region, view: sublime.View
-    ) -> None:
+    ):  # type: (...) -> None
         """Run code with Jupyter kernel."""
         msg_id = self.client.execute(code)
         self.id2region[msg_id] = (
@@ -570,7 +570,7 @@ class KernelConnection(object):
 
     def get_complete(
         self, code: str, cursor_pos: int, timeout: Optional[int] = None
-    ) -> List[Tuple[str, str]]:
+    ):  # type: (...) -> List[Tuple[str, str]]
         """Generate complete request."""
         if self.execution_state is not ExecState.IDLE:
             return []
@@ -623,7 +623,7 @@ class KernelConnection(object):
         code: str,
         cursor_pos: int,
         detail_level: int = 0,
-        timeout: Optional[int] = None,
+        timeout: Optional[int] = None
     ):
         """Get object inspection by sending a `inspect_request` message to kernel."""
         msg_id = self.client.inspect(code, cursor_pos, detail_level)
