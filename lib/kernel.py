@@ -82,7 +82,7 @@ IMAGE_PHANTOM = """<body id="helium-image-result" style="background-color:white"
   </style>
   <a class=closebutton href=hide>×</a>
   <br>
-  <img class="image" alt="Out" width="20" src="data:image/png;base64,{data}" />
+  <img class="image" alt="Out" src="data:image/png;base64,{data}" />
 </body>"""
 
 STREAM_PHANTOM = "<div class={name}>{content}</div>"
@@ -454,7 +454,8 @@ class KernelConnection(object):
     ):
         if self._show_inline_output:
             id = HELIUM_FIGURE_PHANTOMS + datetime.now().isoformat()
-            html = IMAGE_PHANTOM.format(data=data)
+            width = view.viewport_extent()[0]
+            html = IMAGE_PHANTOM.format(data=data, width=width)
             view.add_phantom(
                 id,
                 region,
@@ -489,6 +490,8 @@ class KernelConnection(object):
             data = mime_data["image/png"].strip()
             self._logger.info("Caught image.")
             self._logger.info("RELOADED -------------=================")
+
+            self._logger.info(self.get_view().viewport_extent())
 
             width = self.get_view().viewport_extent()[0] - 2
             dimensions = get_png_dimensions(data)
