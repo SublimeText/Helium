@@ -18,6 +18,7 @@ jobs:
           sh github.sh run_tests --coverage
           # sh github.sh run_syntax_tests --coverage
       - run: |
+          apt-get update
           apt-get install python3-pip -y
           pip3 install coverage==4.5.4 codecov==2.0.15
           codecov
