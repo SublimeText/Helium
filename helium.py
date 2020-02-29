@@ -17,7 +17,7 @@ import sublime
 import sublime_lib
 from sublime_plugin import EventListener, TextCommand, ViewEventListener
 
-from .lib.kernel import KernelConnection
+from .lib.kernel import KernelConnection, ExecState
 from .lib.utils import add_path, chain_callbacks
 
 with add_path(os.path.join(os.path.dirname(__file__), "lib/client")):
@@ -847,28 +847,21 @@ class StatusBar(object):
     def stop(self):
         self.view.set_status(HELIUM_STATUS_KEY, "")
 
-    def update(self, ticks=0):
+    def update(self, ticks: int = 0) -> None:
         # `ticks` can't be a property of `StatusBar` because it's not updated
         # when `update()` is called by `sublime.set_timeout[_async]()`.
         if self.buffer_id != sublime.active_window().active_view().buffer_id():
             # Stop when view is unfocused.
             self.stop()
-            return
-
-        execution_state = self.kernel.execution_state
-
-        # TODO: Rethink which state should be terminating
-        if execution_state in ("dead", "idle"):
-            # Stop when kernel is dead/idle.
+        elif self.kernel.execution_state is ExecState.BUSY:
+            # Tick indicator if still busy
+            self.indicator.label = "{}: Busy".format(self.kernel.repr)
+            status = self.indicator.render(ticks)
+            self.view.set_status(HELIUM_STATUS_KEY, status)
+            sublime.set_timeout_async(lambda: self.update(ticks + 1), self.interval)
+        else:
+            # Stop when kernel is not busy anymore.
             self.stop()
-            return
-
-        self.indicator.label = "{repr}: {execution_state}".format(
-            repr=self.kernel.repr, execution_state=self.kernel.execution_state
-        )
-        status = self.indicator.render(ticks)
-        self.view.set_status(HELIUM_STATUS_KEY, status)
-        sublime.set_timeout_async(lambda: self.update(ticks + 1), self.interval)
 
 
 class HeliumStatusUpdater(ViewEventListener):
