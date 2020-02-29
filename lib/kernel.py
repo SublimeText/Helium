@@ -11,7 +11,7 @@ from queue import Empty, Queue
 from threading import Event, RLock, Thread
 
 import sublime
-from enum import Enum
+from enum import Enum, unique
 
 from .utils import show_password_input
 from .utils import get_png_dimensions
@@ -34,6 +34,23 @@ class MsgType(Enum):
     ERROR = "error"
     STREAM = "stream"
     STATUS = "status"
+    UNKNOWN = "unknown"
+
+
+
+@unique
+class ExecState(Enum):
+    """Representation of execution states.
+
+    https://jupyter-client.readthedocs.io/en/stable/messaging.html#kernel-status
+    """
+
+    # TODO: use auto, once on ST4
+    BUSY = 0
+    IDLE = 1
+    STARTING = 2
+    # `UNKNOWN` is a custom state not in the protocol specification
+    UNKNOWN = 3
 
 
 HELIUM_FIGURE_PHANTOMS = "helium_figure_phantoms"
@@ -154,18 +171,25 @@ class KernelConnection(object):
                     self._kernel._logger.info(msg)
                     content = msg.get("content", {})
                     execution_count = content.get("execution_count", None)
-                    msg_type = msg["msg_type"]
+                    try:
+                        msg_type = MsgType[msg["msg_type"].upper()]
+                    except KeyError:
+                        msg_type = MsgType.UNKNOWN
+
                     view, region = self._kernel.id2region.get(
                         msg["parent_header"].get("msg_id", None), (None, None)
                     )
-                    if msg_type == MsgType.STATUS:
-                        self._kernel._execution_state = content["execution_state"]
-                    elif msg_type == MsgType.EXECUTE_INPUT:
+
+                    self._kernel._logger.info(msg_type)
+                    if msg_type is MsgType.STATUS:
+                        state = ExecState[content["execution_state"].upper()]
+                        self._kernel._execution_state = state
+                    elif msg_type is MsgType.EXECUTE_INPUT:
                         self._kernel._write_text_to_view("\n\n")
                         self._kernel._output_input_code(
                             content["code"], content["execution_count"]
                         )
-                    elif msg_type == MsgType.ERROR:
+                    elif msg_type is MsgType.ERROR:
                         self._kernel._logger.info("Handling error")
                         self._kernel._handle_error(
                             execution_count,
@@ -175,15 +199,15 @@ class KernelConnection(object):
                             region,
                             view,
                         )
-                    elif msg_type == MsgType.DISPLAY_DATA:
+                    elif msg_type is MsgType.DISPLAY_DATA:
                         self._kernel._write_mime_data_to_view(
                             content["data"], region, view
                         )
-                    elif msg_type == MsgType.EXECUTE_RESULT:
+                    elif msg_type is MsgType.EXECUTE_RESULT:
                         self._kernel._write_mime_data_to_view(
                             content["data"], region, view
                         )
-                    elif msg_type == MsgType.STREAM:
+                    elif msg_type is MsgType.STREAM:
                         self._kernel._handle_stream(
                             content["name"], content["text"], region, view,
                         )
@@ -254,7 +278,7 @@ class KernelConnection(object):
         self.shell_msg_queues_lock = RLock()
         self.id2region = {}
         self._connection_name = connection_name
-        self._execution_state = "unknown"
+        self._execution_state = ExecState.UNKNOWN
         self._init_receivers()
 
     def __del__(self):  # noqa
@@ -320,7 +344,7 @@ class KernelConnection(object):
             )
 
     @property
-    def execution_state(self):
+    def execution_state(self) -> ExecState:
         return self._execution_state
 
     @property
@@ -536,7 +560,7 @@ class KernelConnection(object):
 
     def get_complete(self, code, cursor_pos, timeout=None):
         """Generate complete request."""
-        if self.execution_state != "idle":
+        if self.execution_state is not ExecState.IDLE:
             return []
         msg_id = self.client.complete(code, cursor_pos)
         self.shell_msg_queues_lock.acquire()
