@@ -11,7 +11,7 @@ from queue import Empty, Queue
 from threading import Event, RLock, Thread
 
 import sublime
-from enum import Enum, auto
+from enum import Enum, unique
 
 from .utils import show_password_input
 
@@ -36,17 +36,20 @@ class MsgType(Enum):
     UNKNOWN = "unknown"
 
 
+
+@unique
 class ExecState(Enum):
     """Representation of execution states.
 
     https://jupyter-client.readthedocs.io/en/stable/messaging.html#kernel-status
     """
 
-    BUSY = auto()
-    IDLE = auto()
-    STARTING = auto()
+    # TODO: use auto, once on ST4
+    BUSY = 0
+    IDLE = 1
+    STARTING = 2
     # `UNKNOWN` is a custom state not in the protocol specification
-    UNKNOWN = auto()
+    UNKNOWN = 3
 
 
 HELIUM_FIGURE_PHANTOMS = "helium_figure_phantoms"
