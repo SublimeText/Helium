@@ -45,6 +45,7 @@ class ExecState(Enum):
     BUSY = auto()
     IDLE = auto()
     STARTING = auto()
+    # `UNKNOWN` is a custom state not in the protocol specification
     UNKNOWN = auto()
 
 
