@@ -8,6 +8,7 @@ Copyright (c) 2016-2018, NEGORO Tetsuya (https://github.com/ngr-t)
 import bisect
 import json
 import os
+from os.path import expanduser
 import re
 import uuid
 from functools import partial
@@ -167,8 +168,17 @@ class HeliumKernelManager(object):
     def start_kernel(
         cls, kernelspec_name=None, connection_info=None, connection_name=None, cwd=None
     ):
-        """Start kernel and return a `Kernel` instance."""
+        """Start kernel and return a `Kernel` instance.
+
+        :cwd: Current work directory, which will be the root for the new kernel. If this 
+                is None, the users home directory will be set instead.
+
+        """
         kernel_id = uuid.uuid4()
+
+        if not cwd:
+            cwd = expanduser("~")
+
         if kernelspec_name:
             kernel_manager = KernelManager(kernel_name=kernelspec_name)
             kernel_manager.start_kernel(cwd=cwd)
@@ -238,8 +248,9 @@ def _start_kernel(window, view, continue_cb=lambda: None, *, logger=HELIUM_LOGGE
     ]
     index = yield partial(window.show_quick_panel, menu_items)
 
-    cwd = None
-    if view:
+    cwd = expanduser('~')
+    
+    if view and view.file_name():
         cwd = os.path.dirname(view.file_name())
 
     if index == -1:
