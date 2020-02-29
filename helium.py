@@ -166,7 +166,7 @@ class HeliumKernelManager(object):  # TODO: Rename to just KernelManager
         cls, kernel_id: UUID, connection_name: str = None
     ):  # type: (...) -> KernelConnection
         """Get KernelConnection object."""
-        return cls.kernels[kernel_id]
+        return cls.kernels[kernel_id]  # type: ignore
 
     @classmethod
     def start_kernel(
@@ -174,7 +174,7 @@ class HeliumKernelManager(object):  # TODO: Rename to just KernelManager
         kernelspec_name=None,
         connection_info=None,
         connection_name: str = None,
-        cwd=None
+        cwd=None,
     ):
         # type: (...) -> KernelConnection
         """Start kernel and return a `Kernel` instance."""
@@ -196,9 +196,12 @@ class HeliumKernelManager(object):  # TODO: Rename to just KernelManager
             kernel_manager,
             cls,
             connection_name=connection_name,
-            logger=cls.logger
+            logger=cls.logger,
         )
-        cls.kernels[kernel_id] = kernel
+        # TODO: Correct inconsistent use of variable name `kernel_id`
+        # is either UUID or Tuple[str, UUID]; maybe rename one variable
+        # to conn_id?
+        cls.kernels[kernel_id] = kernel  # type: ignore
         return kernel
 
     @classmethod
@@ -226,7 +229,7 @@ def _enter_connection_info(
         "Enter connection info or the path to connection file.",
         "",
         on_change=None,
-        on_cancel=None
+        on_cancel=None,
     )
     try:
         continue_cb(json.loads(connection_info_str))
@@ -270,7 +273,7 @@ def _start_kernel(
             "connection name",
             "",
             on_change=None,
-            on_cancel=None
+            on_cancel=None,
         )
 
         if connection_name == "":
@@ -299,7 +302,7 @@ def _start_kernel(
             "shell_port": shell_port,
             "iopub_port": iopub_port,
             "stdin_port": stdin_port,
-            "hb_port": hb_port
+            "hb_port": hb_port,
         }
         connection_info.update(new_ports)
         connection_name = yield partial(
@@ -307,7 +310,7 @@ def _start_kernel(
             "connection name",
             "",
             on_change=None,
-            on_cancel=None
+            on_cancel=None,
         )
         kernel = HeliumKernelManager.start_kernel(
             connection_info=connection_info, connection_name=connection_name
@@ -320,14 +323,14 @@ def _start_kernel(
             "connection name",
             "",
             on_change=None,
-            on_cancel=None
+            on_cancel=None,
         )
         if connection_name == "":
             connection_name = None
         kernel = HeliumKernelManager.start_kernel(
             kernelspec_name=selected_kernelspec,
             connection_name=connection_name,
-            cwd=cwd
+            cwd=cwd,
         )
     ViewManager.connect_kernel(view.buffer_id(), kernel.lang, kernel.kernel_id)
     if view.file_name():
@@ -396,7 +399,7 @@ def _list_kernels(window: sublime.Window, view: sublime.View, *, logger=HELIUM_L
         ).format(
             view_name=view_name,
             buffer_id=view.buffer_id(),
-            kernel_id=selected_kernel["id"]
+            kernel_id=selected_kernel["id"],
         )
         logger.info(log_info_msg)
     elif choice is KernelPaletteCommand.RENAME:
@@ -408,7 +411,7 @@ def _list_kernels(window: sublime.Window, view: sublime.View, *, logger=HELIUM_L
             "New name",
             curr_name,
             on_change=None,
-            on_cancel=None
+            on_cancel=None,
         )
         conn.connection_name = new_name
     elif choice is KernelPaletteCommand.INTERRUPT:
@@ -483,7 +486,7 @@ def _connect_kernel(
         ).format(
             view_name=view_name,
             buffer_id=view.buffer_id(),
-            kernel_id=selected_kernel["id"]
+            kernel_id=selected_kernel["id"],
         )
         logger.info(log_info_msg)
     sublime.set_timeout_async(lambda: StatusBar(view), 0)
@@ -697,7 +700,7 @@ def update_run_cell_phantoms(view: sublime.View, *, logger=HELIUM_LOGGER):
             sublime.LAYOUT_INLINE,
             on_navigate=lambda href, view=view, region=code_region: _execute_cell(
                 view, region
-            )
+            ),
         )
 
 

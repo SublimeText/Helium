@@ -203,7 +203,7 @@ class KernelConnection(object):
                             content["evalue"],
                             content["traceback"],
                             region,
-                            view
+                            view,
                         )
                     elif msg_type is MsgType.DISPLAY_DATA:
                         self._kernel._write_mime_data_to_view(
@@ -271,7 +271,7 @@ class KernelConnection(object):
         kernel_manager,  # TODO: This might be KernelManager,
         parent,
         connection_name=None,
-        logger=None
+        logger=None,
     ):
         """Initialize KernelConnection class.
 
@@ -281,14 +281,14 @@ class KernelConnection(object):
         parent parent kernel manager
         """
         self._logger = logger
-        self.shell_msg_queues = defaultdict(Queue)  # tpye: DefaultDict
+        self.shell_msg_queues = defaultdict(Queue)  # type: ignore
         self._kernel_id = kernel_id
         self.parent = parent
         self.kernel_manager = kernel_manager
         self.client = self.kernel_manager.client()
         self.client.start_channels()
         self.shell_msg_queues_lock = RLock()
-        self.id2region = {}
+        self.id2region = {}  # type: ignore
         self._connection_name = connection_name
         self._execution_state = ExecState.UNKNOWN
         self._init_receivers()
@@ -333,7 +333,7 @@ class KernelConnection(object):
         get_connection_name,
         set_connection_name,
         del_connection_name,
-        "Name of kernel connection shown in a view title."
+        "Name of kernel connection shown in a view title.",
     )
 
     @property
@@ -348,7 +348,7 @@ class KernelConnection(object):
             return "{connection_name} ([{lang}] {kernel_id})".format(
                 connection_name=self.connection_name,
                 lang=self.lang,
-                kernel_id=self.kernel_id
+                kernel_id=self.kernel_id,
             )
         else:
             return "[{lang}] {kernel_id}".format(
@@ -386,7 +386,7 @@ class KernelConnection(object):
         evalue: str,
         traceback: str,
         region: sublime.Region = None,
-        view: sublime.View = None
+        view: sublime.View = None,
     ):  # type: (...) -> None
         try:
             lines = "\nError[{execution_count}]: {ename}, {evalue}."
@@ -394,8 +394,8 @@ class KernelConnection(object):
                 execution_count=execution_count,
                 ename=ename,
                 evalue=evalue,
-                traceback="\n".join(traceback)
-            )
+                traceback="\n".join(traceback),
+            )  # type: ignore
             lines = remove_ansi_escape(lines)
             self._write_text_to_view(lines)
             if region is not None:
@@ -412,7 +412,7 @@ class KernelConnection(object):
         name: str,
         text: str,
         region: sublime.Region = None,
-        view: sublime.View = None
+        view: sublime.View = None,
     ):  # type: (...) -> None
         # Currently don't consider real time catching of streams.
         try:
@@ -625,7 +625,7 @@ class KernelConnection(object):
         code: str,
         cursor_pos: int,
         detail_level: int = 0,
-        timeout: Optional[int] = None
+        timeout: Optional[int] = None,
     ):
         """Get object inspection by sending a `inspect_request` message to kernel."""
         msg_id = self.client.inspect(code, cursor_pos, detail_level)
