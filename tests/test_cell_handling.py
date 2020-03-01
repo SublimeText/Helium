@@ -77,3 +77,8 @@ class TestDelimiterSearch(ViewTestCase):
         for i in range(10):
             # TODO: Use subTest once on ST4
             self.check_content_against_match_count("# in: \n" * i, i)
+
+    def test_view_find_patterns_mixed(self):
+        for i in range(10):
+            # TODO: Use subTest once on ST4
+            self.check_content_against_match_count("# %% \n# in: \n" * i, i * 2)
