@@ -5,7 +5,8 @@
 			"enum",
 			"python-six",
 			"pyzmq",
-			"sublime_lib"
+			"sublime_lib",
+			"typing"
 		]
 	},
 	"osx": {
@@ -16,7 +17,8 @@
 			"ptyprocess",
 			"python-six",
 			"pyzmq",
-			"sublime_lib"
+			"sublime_lib",
+			"typing"
 		]
 	},
 	"linux": {
@@ -27,7 +29,8 @@
 			"ptyprocess",
 			"python-six",
 			"pyzmq",
-			"sublime_lib"
+			"sublime_lib",
+			"typing"
 		]
 	}
 }
