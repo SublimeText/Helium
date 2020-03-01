@@ -1,11 +1,8 @@
-import re
-from unittest import TestCase
-
 import sublime
 
 from _helpers import ViewTestCase
 
-good_delimiters = (
+valid_delimiters = (
     # %% pattern
     "#%%",
     "# %%",
@@ -16,7 +13,7 @@ good_delimiters = (
     "#in:"
 )
 
-bad_delimiters = (
+invalid_delimiters = (
     "#",
     "#%",
     "#%?",
@@ -34,28 +31,7 @@ bad_delimiters = (
 )
 
 
-class TestDelimiterRegex(TestCase):
-    def setUp(self):
-        s = sublime.load_settings("Helium.sublime-settings")
-        self.rgx = re.compile(s.get("cell_delimiter_pattern"))
-
-    # Note: ST does not use python re for view.findall internall
-    # see: https://forum.sublimetext.com/t/question-about-view-find-find-all-pattern/33682
-    # We want some basic re tests nonetheless
-    def test_good_delimiters_matched(self):
-        for d in good_delimiters:
-            # TODO: Use subTest once on ST4
-            match = self.rgx.match(d)
-            self.assertTrue(match)
-
-    def test_bad_delimiters_not_matched(self):
-        for d in bad_delimiters:
-            # TODO: Use subTest once on ST4
-            match = self.rgx.match(d)
-            self.assertIsNone(match)
-
-
-class TestDelimiterSearch(ViewTestCase):
+class TestDelimiter(ViewTestCase):
 
     def find_all_delimiters(self):
         s = sublime.load_settings("Helium.sublime-settings")
@@ -68,22 +44,32 @@ class TestDelimiterSearch(ViewTestCase):
         matches = self.find_all_delimiters()
         assert len(matches) == expected_count
 
-    def test_view_find_pattern_one(self):
+    def test_pattern_against_delimiteres_valid(self):
+        """Succeed if all of the valid delimiters match."""
+        for d in valid_delimiters:
+            # TODO: Use subTest once on ST4
+            self.check_content_against_match_count(d, 1)
+
+    def test_pattern_against_delimiteres_invalid(self):
+        """Succeed if none of the invalid delimiters match."""
+        for d in invalid_delimiters:
+            # TODO: Use subTest once on ST4
+            self.check_content_against_match_count(d, 0)
+
+    def test_delimiter_match_count_against_pattern_one(self):
+        """Succeed if match count from view.find_all equal its expectation."""
         for i in range(10):
             # TODO: Use subTest once on ST4
             self.check_content_against_match_count("# %% \n" * i, i)
 
-    def test_view_find_pattern_two(self):
+    def test_delimiter_match_count_against_pattern_two(self):
+        """Succeed if match count from view.find_all equal its expectation."""
         for i in range(10):
             # TODO: Use subTest once on ST4
             self.check_content_against_match_count("# in: \n" * i, i)
 
-    def test_view_find_patterns_mixed(self):
+    def test_delimiter_match_count_against_pattern_mixed(self):
+        """Succeed if match count from view.find_all equal its expectation."""
         for i in range(10):
             # TODO: Use subTest once on ST4
             self.check_content_against_match_count("# %% \n# in: \n" * i, i * 2)
-
-    def test_view_find_not_bad_pattern(self):
-        for d in bad_delimiters:
-            # TODO: Use subTest once on ST4
-            self.check_content_against_match_count(d, 0)
