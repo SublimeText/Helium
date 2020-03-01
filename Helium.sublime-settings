@@ -1,4 +1,5 @@
 {
+  // TODO: Allow specifying patterns in array
   "cell_delimiter_pattern": "^(#\\s?%%)|# ?in(\\[\\d{0,1000}\\])?:\\s*$",
   // Regex pattern to find code cell blocks delimiters
   // The default value hits the patterns below.
