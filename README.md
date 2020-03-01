@@ -61,7 +61,7 @@ Execute code by `Helium: Execute Block` (whose command name is `helium_execute_b
 
 #### Code cell
 
-Regions surrounded by `# %%` or `# <codecell>` (you can configure it in `cell_delimiter_pattern` option item) are considered as "code cells".
+Regions surrounded by `# %%` or `# in:` (you can configure it in `cell_delimiter_pattern` option item) are considered as "code cells".
 
 You can execute a region by `Helium: Execute cell` (`helium_execute_cell`) or `Helium: Execute Cell and Move` command.
 Each cell has a clickable "Run Cell" phantom that appears next to the cell markers to run the cell.
