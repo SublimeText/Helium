@@ -22,5 +22,9 @@ class ViewTestCase(TestCase):
             self.view.set_scratch(True)
             self.view.window().run_command("close_file")
 
-    def setText(self, string):
+    def set_text(self, string):
         self.view.run_command("insert", {"characters": string})
+
+    def clear_view(self):
+        self.view.run_command("select_all")
+        self.view.run_command("right_delete")

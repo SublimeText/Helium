@@ -10,10 +10,9 @@ good_delimiters = (
     "#%%",
     "# %%",
     # `in` pattern
-    "# In[5]:",
-    "# In[]:",
-    "# In:",
-    "#In:",
+    "# in[5]:",
+    "# in[]:",
+    "# in:",
     "#in:"
 )
 
@@ -28,14 +27,17 @@ bad_delimiters = (
     "#xin:",
     "#        in:",
     "# in",
-    "in:"
+    "in:",
+    "# In[5]:",
+    "# In[]:",
+    "# In:"
 )
 
 
 class TestDelimiterRegex(TestCase):
     def setUp(self):
         s = sublime.load_settings("Helium.sublime-settings")
-        self.rgx = re.compile(s.get("cell_delimiter_pattern"), re.I)
+        self.rgx = re.compile(s.get("cell_delimiter_pattern"))
 
     # Note: ST does not use python re for view.findall internall
     # see: https://forum.sublimetext.com/t/question-about-view-find-find-all-pattern/33682
@@ -60,12 +62,18 @@ class TestDelimiterSearch(ViewTestCase):
         pattern = s.get("cell_delimiter_pattern")
         return self.view.find_all(pattern)
 
-    def test_view_find_all(self):
-        self.setText("")
+    def check_content_against_match_count(self, content, expected_count):
+        self.clear_view()
+        self.set_text(content)
         matches = self.find_all_delimiters()
-        assert len(matches) == 0
+        assert len(matches) == expected_count
 
-    def test_view_find_one(self):
-        self.setText("# %%")
-        matches = self.find_all_delimiters()
-        assert len(matches) == 1
+    def test_view_find_pattern_one(self):
+        for i in range(10):
+            # TODO: Use subTest once on ST4
+            self.check_content_against_match_count("# %% \n" * i, i)
+
+    def test_view_find_pattern_two(self):
+        for i in range(10):
+            # TODO: Use subTest once on ST4
+            self.check_content_against_match_count("# in: \n" * i, i)
