@@ -1,7 +1,7 @@
 [![codecov](https://codecov.io/gh/pykong/Helium/branch/master/graph/badge.svg)](https://codecov.io/gh/pykong/Helium)
 ![](https://github.com/pykong/Helium/workflows/CI/badge.svg)
 
-Helium package for Sublime Text 3
+Helium for Sublime Text 3
 ===
 
 Helium is a package for Sublime Text 3, which provides in-editor code execution and autocomplete in interaction with Jupyter kernels.
