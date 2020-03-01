@@ -14,8 +14,6 @@ Any feedback is highly welcome. I hope this package will help your life with ST3
 
 ## Installation
 
-Now this package is under the package control channel!
-
 You can install it with Package Control plugin, run `Package Control: Install Package`, then choose `Helium` from the package list.
 
 
