@@ -1,5 +1,9 @@
-[![codecov](https://codecov.io/gh/pykong/Helium/branch/master/graph/badge.svg)](https://codecov.io/gh/pykong/Helium)
 ![](https://github.com/pykong/Helium/workflows/CI/badge.svg)
+[![codecov](https://codecov.io/gh/pykong/Helium/branch/master/graph/badge.svg)](https://codecov.io/gh/pykong/Helium)
+[![Checked with mypy](http://www.mypy-lang.org/static/mypy_badge.svg)](http://mypy-lang.org/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+![Latest version](https://img.shields.io/github/v/release/pykong/Helium?include_prereleases)
+[![Downloads](https://img.shields.io/packagecontrol/dt/Hermes)](https://packagecontrol.io/packages/Hermes)
 
 Helium for Sublime Text 3
 ===
