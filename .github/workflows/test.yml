@@ -1,31 +1,22 @@
-# if you are looking for a working example
-# refer to https://github.com/randy3k/UnitTesting-example/blob/master/.github/workflows/build.yml
-
-name: Test
+name: build
 
 on: [push]
 
 jobs:
   linux:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [x32, x64]
-    container: sublimetext/unittesting:${{ matrix.arch }}
-    env:
-      SUBLIME_TEXT_ARCH: ${{ matrix.arch }}
+    container: sublimetext/unittesting
     steps:
       - uses: actions/checkout@v1
       - run: sh -e /etc/init.d/xvfb start
+      - run: curl -OL https://raw.githubusercontent.com/SublimeText/UnitTesting/master/sbin/github.sh
       - run: |
           PATH="$HOME/.local/bin:$PATH"
-          sh sbin/github.sh bootstrap
-          sh sbin/github.sh install_color_scheme_unit
-          sh sbin/github.sh install_package_control
-          sh sbin/github.sh run_tests --coverage
+          sh github.sh bootstrap
+          sh github.sh install_package_control
+          sh github.sh run_tests --coverage
+          # sh github.sh run_syntax_tests --coverage
       - run: |
-          apt-get update
           apt-get install python3-pip -y
           pip3 install coverage==4.5.4 codecov==2.0.15
           codecov
@@ -36,12 +27,13 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v1
+      - run: curl -OL https://raw.githubusercontent.com/SublimeText/UnitTesting/master/sbin/github.sh
       - run: |
           export PATH="$HOME/.local/bin:$PATH"
-          sh sbin/github.sh bootstrap
-          sh sbin/github.sh install_color_scheme_unit
-          sh sbin/github.sh install_package_control
-          sh sbin/github.sh run_tests --coverage
+          sh github.sh bootstrap
+          sh github.sh install_package_control
+          sh github.sh run_tests --coverage
+          # sh github.sh run_syntax_tests --coverage
       - run: |
           pip3 install coverage==4.5.4 codecov==2.0.15
           codecov
@@ -50,19 +42,14 @@ jobs:
 
   windows:
     runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [x32, x64]
-    env:
-      SUBLIME_TEXT_ARCH: ${{ matrix.arch }}
     steps:
       - uses: actions/checkout@v1
+      - run: (new-object net.webclient).DownloadFile("https://raw.githubusercontent.com/SublimeText/UnitTesting/master/sbin/github.ps1","github.ps1")
       - run: |
-          ./sbin/github.ps1 "bootstrap" -verbose
-          ./sbin/github.ps1 "install_color_scheme_unit" -verbose
-          ./sbin/github.ps1 "install_package_control" -verbose
-          ./sbin/github.ps1 "run_tests" -coverage -verbose
+          ./github.ps1 "bootstrap" -verbose
+          ./github.ps1 "install_package_control" -verbose
+          ./github.ps1 "run_tests" -coverage -verbose
+          # ./github.ps1 "run_syntax_tests" -coverage -verbose
       - run: |
           pip3 install coverage==4.5.4 codecov==2.0.15
           codecov
