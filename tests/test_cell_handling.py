@@ -82,3 +82,8 @@ class TestDelimiterSearch(ViewTestCase):
         for i in range(10):
             # TODO: Use subTest once on ST4
             self.check_content_against_match_count("# %% \n# in: \n" * i, i * 2)
+
+    def test_view_find_not_bad_pattern(self):
+        for d in bad_delimiters:
+            # TODO: Use subTest once on ST4
+            self.check_content_against_match_count(d, 0)
