@@ -4,20 +4,29 @@ from unittest import TestCase
 import sublime
 
 good_delimiters = (
+    # %% pattern
+    "#%%",
+    "# %%",
+    # `in` pattern
     "# In[5]:",
     "# In[]:",
     "# In:",
     "#In:",
-    "#in:",
+    "#in:"
 )
 
 bad_delimiters = (
+    "#",
+    "#%",
+    "#%?",
+    "%",
+    "% 123",
     "no way",
     "# normal comment",
     "#xin:",
     "#        in:",
     "# in",
-    "in:",
+    "in:"
 )
 
 
@@ -26,6 +35,9 @@ class TestDelimiterRegex(TestCase):
         s = sublime.load_settings("Helium.sublime-settings")
         self.rgx = re.compile(s.get("cell_delimiter_pattern"), re.I)
 
+    # Note: ST does not use python re for view.findall internall
+    # see: https://forum.sublimetext.com/t/question-about-view-find-find-all-pattern/33682
+    # We want some basic re tests nonetheless
     def test_good_delimiters_matched(self):
         for d in good_delimiters:
             # TODO: Use subTest once on ST4
