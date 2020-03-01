@@ -3,6 +3,8 @@ from unittest import TestCase
 
 import sublime
 
+from _helpers import ViewTestCase
+
 good_delimiters = (
     # %% pattern
     "#%%",
@@ -49,3 +51,21 @@ class TestDelimiterRegex(TestCase):
             # TODO: Use subTest once on ST4
             match = self.rgx.match(d)
             self.assertIsNone(match)
+
+
+class TestDelimiterSearch(ViewTestCase):
+
+    def find_all_delimiters(self):
+        s = sublime.load_settings("Helium.sublime-settings")
+        pattern = s.get("cell_delimiter_pattern")
+        return self.view.find_all(pattern)
+
+    def test_view_find_all(self):
+        self.setText("")
+        matches = self.find_all_delimiters()
+        assert len(matches) == 0
+
+    def test_view_find_one(self):
+        self.setText("# %%")
+        matches = self.find_all_delimiters()
+        assert len(matches) == 1

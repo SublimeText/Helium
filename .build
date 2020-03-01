@@ -840,6 +840,7 @@
 		".venv/lib/python3.8/site-packages/typed_ast/conversions.py",
 		".venv/lib/python3.8/site-packages/typed_ast/ast27.py",
 		".venv/lib/python3.8/site-packages/typed_ast/tests/test_basics.py",
-		"tests/test_cell_handling.py"
+		"tests/test_cell_handling.py",
+		"tests/_helpers.py"
 	]
 }
