@@ -3,6 +3,7 @@
 		"*": [
 			"dateutil",
 			"enum",
+			"pathlib",
 			"python-six",
 			"pyzmq",
 			"sublime_lib",
@@ -13,6 +14,7 @@
 		"*": [
 			"dateutil",
 			"enum",
+			"pathlib",
 			"pexpect",
 			"ptyprocess",
 			"python-six",
@@ -25,6 +27,7 @@
 		"*": [
 			"dateutil",
 			"enum",
+			"pathlib",
 			"pexpect",
 			"ptyprocess",
 			"python-six",
