@@ -1,6 +1,5 @@
 # Python Stuff
 *.pyc
-.mypy_cache
 .venv/
 
 # Sublime Stuff

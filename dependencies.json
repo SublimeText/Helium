@@ -3,37 +3,28 @@
 		"*": [
 			"dateutil",
 			"enum",
-			"pathlib",
 			"python-six",
-			"pyzmq",
-			"sublime_lib",
-			"typing"
+			"pyzmq"
 		]
 	},
 	"osx": {
 		"*": [
 			"dateutil",
 			"enum",
-			"pathlib",
 			"pexpect",
 			"ptyprocess",
 			"python-six",
-			"pyzmq",
-			"sublime_lib",
-			"typing"
+			"pyzmq"
 		]
 	},
 	"linux": {
 		"*": [
 			"dateutil",
 			"enum",
-			"pathlib",
 			"pexpect",
 			"ptyprocess",
 			"python-six",
-			"pyzmq",
-			"sublime_lib",
-			"typing"
+			"pyzmq"
 		]
 	}
 }
