@@ -12,6 +12,7 @@ import re
 import uuid
 from functools import partial
 from logging import INFO, StreamHandler, getLogger
+from os.path import expanduser
 
 import sublime
 from sublime_plugin import EventListener, TextCommand, ViewEventListener
@@ -165,6 +166,9 @@ class HeliumKernelManager(object):
     ):
         """Start kernel and return a `Kernel` instance."""
         kernel_id = uuid.uuid4()
+        if not cwd:
+            cwd = expanduser('~')
+
         if kernelspec_name:
             kernel_manager = KernelManager(kernel_name=kernelspec_name)
             kernel_manager.start_kernel(cwd=cwd)
@@ -235,7 +239,10 @@ def _start_kernel(window, view, continue_cb=lambda: None, *, logger=HELIUM_LOGGE
     index = yield partial(window.show_quick_panel, menu_items)
 
     cwd = None
+
     if view:
+        cwd = expanduser('~')
+    if view and view.file_name():
         cwd = os.path.dirname(view.file_name())
 
     if index == -1:
