@@ -159,6 +159,7 @@ class KernelConnection(object):
                     view, region = self._kernel.id2region.get(
                         msg["parent_header"].get("msg_id", None), (None, None)
                     )
+                    
                     if msg_type == MSG_TYPE_STATUS:
                         self._kernel._execution_state = content["execution_state"]
                     elif msg_type == MSG_TYPE_EXECUTE_INPUT:
@@ -406,6 +407,7 @@ class KernelConnection(object):
         self.activate_view()
         file_size = self.get_view().size()
         region = sublime.Region(file_size, file_size)
+
         self.get_view().add_phantom(
             HELIUM_FIGURE_PHANTOMS, region, content, sublime.LAYOUT_BLOCK
         )
@@ -533,7 +535,7 @@ class KernelConnection(object):
         msg_id = self.client.execute(code)
         self.id2region[msg_id] = (
             view,
-            sublime.Region(phantom_region.end(), phantom_region.end()),
+            sublime.Region(phantom_region.end()-1, phantom_region.end()-1),
         )
         info_message = "Kernel executed code ```{code}```.".format(code=code)
         self._logger.info(info_message)
