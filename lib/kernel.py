@@ -13,6 +13,7 @@ from queue import Empty, Queue
 import sublime
 
 from .utils import show_password_input
+from .utils import get_png_dimensions
 
 
 JUPYTER_PROTOCOL_VERSION = "5.0"
@@ -65,7 +66,7 @@ IMAGE_PHANTOM = """<body id="helium-image-result" style="background-color:white"
   </style>
   <a class=closebutton href=hide>×</a>
   <br>
-  <img class="image" alt="Out" src="data:image/png;base64,{data}" />
+  <img class="image" alt="Out" style="width: {width}; height: {height}" src="data:image/png;base64,{data}" />
 </body>"""
 
 STREAM_PHANTOM = "<div class={name}>{content}</div>"
@@ -430,7 +431,14 @@ class KernelConnection(object):
     ):
         if self._show_inline_output:
             id = HELIUM_FIGURE_PHANTOMS + datetime.now().isoformat()
-            html = IMAGE_PHANTOM.format(data=data)
+
+            width = view.viewport_extent()[0] - 2
+            dimensions = get_png_dimensions(data)
+            scale_factor = width / dimensions[0]
+            height = dimensions[1] * scale_factor
+            
+            html = IMAGE_PHANTOM.format(data=data, width=width, height=height)
+
             view.add_phantom(
                 id,
                 region,
@@ -463,13 +471,20 @@ class KernelConnection(object):
 
         if "image/png" in mime_data:
             data = mime_data["image/png"].strip()
-            self._logger.info("Caught image.")
-            self._logger.info("RELOADED -------------=================")
+
+            self._logger.info(self.get_view().viewport_extent())
+            width = self.get_view().viewport_extent()[0] - 2
+            dimensions = get_png_dimensions(data)
+
+            scale_factor = width / dimensions[0]
+            height = dimensions[1] * scale_factor
+
             content = (
                 '<body style="background-color:white">'
-                + '<img alt="Out" src="data:image/png;base64,{data}" />'
+                '<img alt="Out" style="width: {width}; height: {height}" src="data:image/png;base64,{data}" />'
                 + "</body>"
-            ).format(data=data, bgcolor="white")
+            ).format(data=data, width=width, height=height, bgcolor="white")
+
             self._write_phantom(content)
             self._write_inline_image_phantom(data, region, view)
 
