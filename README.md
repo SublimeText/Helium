@@ -6,7 +6,7 @@ The concept of an editor extension communicating Jupyter kernels is inspired by 
 
 Any feedback is highly welcome. I hope this package will help your life with ST3!
 
-![Introduction image](raw/images/README/intro.png)
+![Introduction image](raw/images/README/animated.gif)
 
 
 ## Installation
@@ -54,6 +54,7 @@ You can install it with Package Control plugin, run `Package Control: Install Pa
 #### Using Python kernel installed via Conda
 
 Python kernel installed via Conda is not found by Jupyter by default. You should add the path to kernel into the `jupyter_path` entry of the config file.
+
 
 ### Execution
 
