@@ -354,8 +354,7 @@ class KernelConnection(object):
         view: sublime.View = None,
     ) -> None:
         try:
-            lines = "\nError[{execution_count}]: {ename}, {evalue}."
-            "\nTraceback:\n{traceback}".format(
+            lines = "\nError[{execution_count}]: {ename}, {evalue}.\nTraceback:\n{traceback}".format(
                 execution_count=execution_count,
                 ename=ename,
                 evalue=evalue,
@@ -368,9 +367,8 @@ class KernelConnection(object):
                     name="error", content=fix_whitespace_for_phantom(lines)
                 )
                 self._write_inline_html_phantom(phantom_html, region, view)
-        except AttributeError:
-            # Just there is no error.
-            pass
+        except AttributeError as ex:
+            self._logger.error("Could not handle error", exc_info=ex)
 
     def _handle_stream(
         self, name, text, region: sublime.Region = None, view: sublime.View = None
@@ -384,9 +382,8 @@ class KernelConnection(object):
             self._write_text_to_view(lines)
             if phantom_html and (region is not None):
                 self._write_inline_html_phantom(phantom_html, region, view)
-        except AttributeError:
-            # Just there is no error.
-            pass
+        except AttributeError as ex:
+            self._logger.exception(ex)
 
     def _write_out_execution_count(self, execution_count) -> None:
         self._write_text_to_view("\nOut[{}]: ".format(execution_count))
