@@ -354,8 +354,8 @@ class KernelConnection(object):
         view: sublime.View = None,
     ) -> None:
         try:
-            lines = "\nError[{execution_count}]: {ename}, {evalue}."
-            "\nTraceback:\n{traceback}".format(
+            lines = """\nError[{execution_count}]: {ename}, {evalue}.
+            \nTraceback:\n{traceback}""".format(
                 execution_count=execution_count,
                 ename=ename,
                 evalue=evalue,
