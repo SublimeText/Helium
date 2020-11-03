@@ -164,9 +164,10 @@ class KernelConnection(object):
                         self._kernel._execution_state = content["execution_state"]
                     elif msg_type == MSG_TYPE_EXECUTE_INPUT:
                         self._kernel._write_text_to_view("\n\n")
-                        self._kernel._output_input_code(
-                            content["code"], content["execution_count"]
-                        )
+                        if sublime.load_settings("Helium.sublime-settings").get("output_code"):
+                            self._kernel._output_input_code(
+                                content["code"], content["execution_count"]
+                            )
                     elif msg_type == MSG_TYPE_ERROR:
                         self._kernel._logger.info("Handling error")
                         self._kernel._handle_error(
