@@ -171,7 +171,6 @@ class KernelConnection(object):
                     elif msg_type == MSG_TYPE_ERROR:
                         self._kernel._logger.info("Handling error")
                         self._kernel._handle_error(
-                            execution_count,
                             content["ename"],
                             content["evalue"],
                             content["traceback"],
@@ -347,7 +346,6 @@ class KernelConnection(object):
 
     def _handle_error(
         self,
-        execution_count,
         ename,
         evalue,
         traceback,
@@ -355,9 +353,8 @@ class KernelConnection(object):
         view: sublime.View = None,
     ) -> None:
         try:
-            lines = """\nError[{execution_count}]: {ename}, {evalue}.
+            lines = """\nError: {ename}, {evalue}.
             \nTraceback:\n{traceback}""".format(
-                execution_count=execution_count,
                 ename=ename,
                 evalue=evalue,
                 traceback="\n".join(traceback),
