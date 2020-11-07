@@ -54,8 +54,9 @@ TEXT_PHANTOM = """<body id="helium-result">
     .error {{ color: var(--redish) }}
     .other {{ color: var(--yellowish) }}
     .closebutton {{ text-decoration: none }}
-  </style>
-  <a class=closebutton href=hide>×</a>
+  </style
+>  <a class=closebutton href="delete">×</a>
+  <a class=copybutton href="copy">copy</a>
   {content}
 </body>"""
 
@@ -64,7 +65,9 @@ IMAGE_PHANTOM = """<body id="helium-image-result" style="background-color:white"
     .image {{ background-color: white }}
     .closebutton {{ text-decoration: none }}
   </style>
-  <a class=closebutton href=hide>×</a>
+  <a class=closebutton href="delete">×</a>
+  <a class=copybutton href="copy">copy</a>
+
   <br>
   <img class="image" alt="Out" style="width: {width}; height: {height}" src="data:image/png;base64,{data}" />
 </body>"""
@@ -424,7 +427,8 @@ class KernelConnection(object):
                 region,
                 html,
                 sublime.LAYOUT_BLOCK,
-                on_navigate=lambda href, id=id: view.erase_phantoms(id),
+                on_navigate=lambda href, id=id, view=view, 
+                content=content: (phantom_callback(id, view, href, content))
             )
             self._logger.info("Created inline phantom {}".format(html))
 
@@ -613,3 +617,17 @@ class KernelConnection(object):
                 self.shell_msg_queues.pop(msg_id, None)
             finally:
                 self.shell_msg_queues_lock.release()
+                
+
+def phantom_callback(id, view, action, content):
+    if action == 'delete':
+        view.erase_phantoms(id) 
+    elif action == 'copy':
+        content = clean_html(content)
+        sublime.set_clipboard(content)
+
+def clean_html(html):
+    html = html.replace('&nbsp;', ' ')
+    html = html.replace('<br>', '\n')
+    clean = re.compile('<.*?>')
+    return re.sub(clean, '', html)
