@@ -1,0 +1,29 @@
+%YAML 1.2
+---
+name: Helium IPython
+scope: source.helium.output
+
+variables:
+  command_start: "In\\[\\d+\\]:"
+  error_start:   "Error\\[[^\\]]+\\]:"   # Not sure what should go inside the brackets of Error
+  streams:       "\\(stdout|display data|stderr\\):"
+
+contexts:
+
+
+  main:
+    - match: |-
+        \b({{command_start}})
+      comment: Cell contents formatted in python
+      name: cell.content
+      embed:  scope:source.python
+      escape: (?={{streams}}|{{command_start}}|{{error_start}}) # Outputs are formatted
+      captures:
+        1: markup.bold
+
+    - match: |-
+        ({{streams}})
+      name: streams
+      comment: Streams' names in bold
+      captures:
+        1: markup.italic 

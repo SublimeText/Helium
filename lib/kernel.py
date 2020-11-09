@@ -519,6 +519,7 @@ class KernelConnection(object):
             active_group = window.active_group()
             view = window.new_file()
             view.set_name(view_name)
+            view.settings().set("syntax", "Packages/Helium/Helium.sublime-syntax")
             num_group = window.num_groups()
             if num_group != 1:
                 if active_group + 1 < num_group:
