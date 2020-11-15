@@ -35,6 +35,7 @@ MSG_TYPE_INPUT_REQUEST = "input_request"
 MSG_TYPE_INPUT_REPLY = "input_reply"
 MSG_TYPE_ERROR = "error"
 MSG_TYPE_STREAM = "stream"
+
 MSG_TYPE_STATUS = "status"
 
 HELIUM_FIGURE_PHANTOMS = "helium_figure_phantoms"
@@ -55,7 +56,7 @@ TEXT_PHANTOM = """<body id="helium-result">
     .other {{ color: var(--yellowish) }}
     .closebutton {{ text-decoration: none }}
   </style
->  <a class=closebutton href="delete">×</a>
+>  <a class=closebutton href="delete">x</a>
   <a class=copybutton href="copy">copy</a>
   {content}
 </body>"""
@@ -65,8 +66,7 @@ IMAGE_PHANTOM = """<body id="helium-image-result" style="background-color:white"
     .image {{ background-color: white }}
     .closebutton {{ text-decoration: none }}
   </style>
-  <a class=closebutton href="delete">×</a>
-  <a class=copybutton href="copy">copy</a>
+  <a class=closebutton href="delete">x</a>
 
   <br>
   <img class="image" alt="Out" style="width: {width}; height: {height}" src="data:image/png;base64,{data}" />
