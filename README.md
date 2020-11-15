@@ -41,15 +41,6 @@ You can install it with Package Control plugin, run `Package Control: Install Pa
   4. Choose `(Enter connection info)`.
   5. Enter the connection info (Helium accepts a path or connection info itself).
 
-#### 4. Connect to a kernel already running under some other Jupyter app, in a SSH server
-
-  1. Configure SSH servers in the setting file (opened by `Helium: Settings` command.)
-  2. Get connection info of the kernel. The way to get connection info differ among kernels, see the doc of each kernel (in ipython kernel, you can get it by `%connect_info` magic.)
-  3. Run `Helium: connect kernel` command.
-  4. Choose `New kernel`.
-  5. Choose `(Connect remote kernel via SSH)`.
-  6. Choose the server, then enter the connection info.
-
 
 #### Using Python kernel installed via Conda
 
