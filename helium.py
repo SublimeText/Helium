@@ -234,7 +234,6 @@ def _start_kernel(window, view, continue_cb=lambda: None, *, logger=HELIUM_LOGGE
     kernelspecs = HeliumKernelManager.list_kernelspecs()
     menu_items = list(kernelspecs.keys()) + [
         "(Enter connection info)",
-        "(Connect remote kernel via SSH)",
     ]
     index = yield partial(window.show_quick_panel, menu_items)
 
