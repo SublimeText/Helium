@@ -1,7 +1,0 @@
-Update in 0.5.4
----------------
-
-* Thanks to the contributions of KennyC, Helium has now code highlighting for the output panel
-* It can be configured if the executed code should be displayed in the output pane
-* Remove SSH options to keep compatibility with all operating systems. 
-* Fixed the exception output
