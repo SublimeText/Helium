@@ -167,7 +167,7 @@ class HeliumKernelManager(object):
         """Start kernel and return a `Kernel` instance."""
         kernel_id = uuid.uuid4()
         if not cwd:
-            cwd = expanduser('~')
+            cwd = expanduser("~")
 
         if kernelspec_name:
             kernel_manager = KernelManager(kernel_name=kernelspec_name)
@@ -240,7 +240,7 @@ def _start_kernel(window, view, continue_cb=lambda: None, *, logger=HELIUM_LOGGE
     cwd = None
 
     if view:
-        cwd = expanduser('~')
+        cwd = expanduser("~")
     if view and view.file_name():
         cwd = os.path.dirname(view.file_name())
 
@@ -733,7 +733,7 @@ def get_cell(
     )
     separators = view.find_all(cell_delimiter_pattern)
     separators.append(sublime.Region(view.size() + 1, view.size() + 1))
-    r = sublime.Region(region.begin(), region.begin())
+    r = sublime.Region(region.begin() + 1, region.begin() + 1)
     start_point = separators[bisect.bisect(separators, r) - 1].end() + 1
     end_point = separators[bisect.bisect(separators, r)].begin() - 1
     cell_region = sublime.Region(start_point, end_point)
