@@ -5,7 +5,6 @@ The package provides code execution and completion in interaction with Jupyter.
 Copyright (c) 2016-2018, NEGORO Tetsuya (https://github.com/ngr-t)
 """
 
-import bisect
 import json
 import os
 import re
@@ -18,7 +17,7 @@ import sublime
 from sublime_plugin import EventListener, TextCommand, ViewEventListener
 
 from .lib.kernel import KernelConnection
-from .lib.utils import add_path, chain_callbacks
+from .lib.utils import add_path, chain_callbacks, get_cell
 
 with add_path(os.path.join(os.path.dirname(__file__), "lib/client")):
     # Import jupyter_client related functions and classes.
@@ -32,6 +31,7 @@ with add_path(os.path.join(os.path.dirname(__file__), "lib/client")):
 HELIUM_LOGGER = getLogger(__name__)
 HANDLER = StreamHandler()
 HANDLER.setLevel(INFO)
+
 
 if len(HELIUM_LOGGER.handlers) == 0:
     HELIUM_LOGGER.setLevel(INFO)
@@ -714,30 +714,6 @@ def get_block(view: sublime.View, s: sublime.Region) -> (str, sublime.Region):
             break
     block_region = sublime.Region(start_point, end_point)
     return (view.substr(block_region), block_region)
-
-
-def get_cell(
-    view: sublime.View, region: sublime.Region, *, logger=HELIUM_LOGGER
-) -> (str, sublime.Region):
-    """Get the code cell under the cursor.
-
-    Cells are separated by markers.
-    Those are defined in `cell_delimiter_pattern` in the config file.
-
-    If `s` is a selected region, the code cell is it.
-    """
-    if not region.empty():
-        return (view.substr(region), region)
-    cell_delimiter_pattern = sublime.load_settings("Helium.sublime-settings").get(
-        "cell_delimiter_pattern"
-    )
-    separators = view.find_all(cell_delimiter_pattern)
-    separators.append(sublime.Region(view.size() + 2, view.size() + 2))
-    r = sublime.Region(region.begin() + 1, region.begin() + 1)
-    start_point = separators[bisect.bisect(separators, r) - 1].end() + 1
-    end_point = separators[bisect.bisect(separators, r)].begin() - 1
-    cell_region = sublime.Region(start_point, end_point)
-    return (view.substr(cell_region), cell_region)
 
 
 @chain_callbacks
