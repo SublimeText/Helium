@@ -732,7 +732,7 @@ def get_cell(
         "cell_delimiter_pattern"
     )
     separators = view.find_all(cell_delimiter_pattern)
-    separators.append(sublime.Region(view.size() + 1, view.size() + 1))
+    separators.append(sublime.Region(view.size() + 2, view.size() + 2))
     r = sublime.Region(region.begin() + 1, region.begin() + 1)
     start_point = separators[bisect.bisect(separators, r) - 1].end() + 1
     end_point = separators[bisect.bisect(separators, r)].begin() - 1
