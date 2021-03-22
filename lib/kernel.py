@@ -437,7 +437,7 @@ class KernelConnection(object):
 
             if dimensions[0] < width:
                 html = IMAGE_PHANTOM.format(
-                    data=data, width=dimensions[0], height=dimensions[0]
+                    data=data, width=dimensions[0], height=dimensions[1]
                 )
             else:
                 scale_factor = width / dimensions[0]
