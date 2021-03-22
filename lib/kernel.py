@@ -159,12 +159,14 @@ class KernelConnection(object):
                     view, region = self._kernel.id2region.get(
                         msg["parent_header"].get("msg_id", None), (None, None)
                     )
-                    
+
                     if msg_type == MSG_TYPE_STATUS:
                         self._kernel._execution_state = content["execution_state"]
                     elif msg_type == MSG_TYPE_EXECUTE_INPUT:
                         self._kernel._write_text_to_view("\n\n")
-                        if sublime.load_settings("Helium.sublime-settings").get("output_code"):
+                        if sublime.load_settings("Helium.sublime-settings").get(
+                            "output_code"
+                        ):
                             self._kernel._output_input_code(
                                 content["code"], content["execution_count"]
                             )
@@ -355,9 +357,7 @@ class KernelConnection(object):
         try:
             lines = """\nError: {ename}, {evalue}.
             \nTraceback:\n{traceback}""".format(
-                ename=ename,
-                evalue=evalue,
-                traceback="\n".join(traceback),
+                ename=ename, evalue=evalue, traceback="\n".join(traceback),
             )
             lines = remove_ansi_escape(lines)
             self._write_text_to_view(lines)
@@ -434,10 +434,16 @@ class KernelConnection(object):
 
             width = view.viewport_extent()[0] - 2
             dimensions = get_png_dimensions(data)
-            scale_factor = width / dimensions[0]
-            height = dimensions[1] * scale_factor
-            
-            html = IMAGE_PHANTOM.format(data=data, width=width, height=height)
+
+            if dimensions[0] < width:
+                html = IMAGE_PHANTOM.format(
+                    data=data, width=dimensions[0], height=dimensions[1]
+                )
+            else:
+                scale_factor = width / dimensions[0]
+                height = dimensions[1] * scale_factor
+
+                html = IMAGE_PHANTOM.format(data=data, width=width, height=height)
 
             view.add_phantom(
                 id,
@@ -534,7 +540,7 @@ class KernelConnection(object):
         msg_id = self.client.execute(code)
         self.id2region[msg_id] = (
             view,
-            sublime.Region(phantom_region.end()-1, phantom_region.end()-1),
+            sublime.Region(phantom_region.end() - 1, phantom_region.end() - 1),
         )
         info_message = "Kernel executed code ```{code}```.".format(code=code)
         self._logger.info(info_message)
