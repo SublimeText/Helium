@@ -147,6 +147,8 @@ class KernelConnection(object):
         def run(self):
             """Run main routine."""
             # TODO: log, handle other message types.
+            prev_msg_type = ""
+
             while not self.exit.is_set():
                 try:
                     msg = self._kernel.client.get_iopub_msg(timeout=1)
@@ -157,6 +159,18 @@ class KernelConnection(object):
                     view, region = self._kernel.id2region.get(
                         msg["parent_header"].get("msg_id", None), (None, None)
                     )
+
+                    # clear phantoms if input was executed and should be displayed
+                    output_msgs = (
+                        MSG_TYPE_DISPLAY_DATA,
+                        MSG_TYPE_ERROR,
+                        MSG_TYPE_EXECUTE_RESULT,
+                        MSG_TYPE_STREAM,
+                    )
+                    if prev_msg_type == MSG_TYPE_EXECUTE_INPUT and (
+                        msg_type in output_msgs
+                    ):
+                        self._kernel._clear_phantoms_in_region(region, view)
 
                     if msg_type == MSG_TYPE_STATUS:
                         self._kernel._execution_state = content["execution_state"]
@@ -189,6 +203,7 @@ class KernelConnection(object):
                         self._kernel._handle_stream(
                             content["name"], content["text"], region, view,
                         )
+                    prev_msg_type = msg_type
                 except Empty:
                     pass
                 except Exception as ex:
@@ -372,9 +387,6 @@ class KernelConnection(object):
     def _handle_stream(
         self, name, text, region: sublime.Region = None, view: sublime.View = None
     ) -> None:
-        # remove existing phantoms in region
-        self._clear_phantoms_in_region(region, view)
-
         # Currently don't consider real time catching of streams.
         try:
             lines = "\n({name}):\n{text}".format(name=name, text=text)
@@ -489,7 +501,6 @@ class KernelConnection(object):
     ) -> None:
         # Now we use basically text/plain for text type.
         # Jupyter kernels often emits html whom minihtml cannot render.
-        self._clear_phantoms_in_region(region, view)
 
         if "text/plain" in mime_data:
             content = mime_data["text/plain"]
