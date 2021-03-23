@@ -24,7 +24,7 @@
   //     "optimal":          The image is either resized or has its original size,
   //                         whichever is smaller.
   // The default is "optimal".
-  "image_size": "resize_to_window",
+  "image_size": "optimal",
 
   // If you use kernels located in the directory other than default search path
   // (see http://jupyter-client.readthedocs.io/en/stable/kernels.html#kernel-specs),
