@@ -161,8 +161,14 @@ class KernelConnection(object):
                     )
 
                     # clear phantoms if input was executed and should be displayed
-                    if prev_msg_type == "execute_input" and (
-                        msg_type in ("display_data", "error")
+                    output_msgs = (
+                        MSG_TYPE_DISPLAY_DATA,
+                        MSG_TYPE_ERROR,
+                        MSG_TYPE_EXECUTE_RESULT,
+                        MSG_TYPE_STREAM,
+                    )
+                    if prev_msg_type == MSG_TYPE_EXECUTE_INPUT and (
+                        msg_type in output_msgs
                     ):
                         self._kernel._clear_phantoms_in_region(region, view)
 
