@@ -418,16 +418,18 @@ class KernelConnection(object):
     ):
         if self._show_inline_output:
             id = HELIUM_FIGURE_PHANTOMS + datetime.now().isoformat()
-            self.phantoms[id] = region
 
             html = TEXT_PHANTOM.format(content=content)
-            view.add_phantom(
+            int_id = view.add_phantom(
                 id,
                 region,
                 html,
                 sublime.LAYOUT_BLOCK,
-                on_navigate=lambda href: self._erase_phantom(id, view=view),
+                on_navigate=lambda href, id=id, view=view: self._erase_phantom(
+                    id, view=view
+                ),
             )
+            self.phantoms[id] = int_id
             self._logger.info("Created inline phantom {}".format(html))
 
     def _write_inline_image_phantom(
@@ -435,7 +437,6 @@ class KernelConnection(object):
     ):
         if self._show_inline_output:
             id = HELIUM_FIGURE_PHANTOMS + datetime.now().isoformat()
-            self.phantoms[id] = region
 
             width = view.viewport_extent()[0] - 2
             dimensions = get_png_dimensions(data)
@@ -450,18 +451,25 @@ class KernelConnection(object):
 
                 html = IMAGE_PHANTOM.format(data=data, width=width, height=height)
 
-            view.add_phantom(
+            int_id = view.add_phantom(
                 id,
                 region,
                 html,
                 sublime.LAYOUT_BLOCK,
-                on_navigate=lambda href: self._erase_phantom(id, view=view),
+                on_navigate=lambda href, id=id, view=view: self._erase_phantom(
+                    id, view=view
+                ),
             )
+            self.phantoms[id] = int_id
             self._logger.info("Created inline phantom image")
 
     def _clear_phantoms_in_region(self, region: sublime.Region, view: sublime.View):
         _, cell = get_cell(view, region, logger="")
-        remove = [pid for pid, reg in self.phantoms.items() if cell.contains(reg)]
+        remove = [
+            pid
+            for pid, int_id in self.phantoms.items()
+            if cell.contains(view.query_phantom(int_id)[0])
+        ]
 
         for pid in remove:
             self._erase_phantom(pid, view=view)
