@@ -7,14 +7,12 @@ Copyright (c) 2017-2018, NEGORO Tetsuya (https://github.com/ngr-t)
 import re
 from collections import defaultdict
 from datetime import datetime
-from threading import Event, Thread, RLock
 from queue import Empty, Queue
+from threading import Event, RLock, Thread
 
 import sublime
 
-from .utils import show_password_input
-from .utils import get_png_dimensions
-
+from .utils import get_cell, get_png_dimensions, show_password_input
 
 JUPYTER_PROTOCOL_VERSION = "5.0"
 
@@ -260,6 +258,7 @@ class KernelConnection(object):
         self._connection_name = connection_name
         self._execution_state = "unknown"
         self._init_receivers()
+        self.phantoms = {}
 
     def __del__(self):  # noqa
         self._shell_msg_receiver.shutdown()
@@ -373,6 +372,9 @@ class KernelConnection(object):
     def _handle_stream(
         self, name, text, region: sublime.Region = None, view: sublime.View = None
     ) -> None:
+        # remove existing phantoms in region
+        self._clear_phantoms_in_region(region, view)
+
         # Currently don't consider real time catching of streams.
         try:
             lines = "\n({name}):\n{text}".format(name=name, text=text)
@@ -416,14 +418,18 @@ class KernelConnection(object):
     ):
         if self._show_inline_output:
             id = HELIUM_FIGURE_PHANTOMS + datetime.now().isoformat()
+
             html = TEXT_PHANTOM.format(content=content)
-            view.add_phantom(
+            int_id = view.add_phantom(
                 id,
                 region,
                 html,
                 sublime.LAYOUT_BLOCK,
-                on_navigate=lambda href, id=id: view.erase_phantoms(id),
+                on_navigate=lambda href, id=id, view=view: self._erase_phantom(
+                    id, view=view
+                ),
             )
+            self.phantoms[id] = int_id
             self._logger.info("Created inline phantom {}".format(html))
 
     def _write_inline_image_phantom(
@@ -450,20 +456,41 @@ class KernelConnection(object):
 
                 html = IMAGE_PHANTOM.format(data=data, width=width, height=height)
 
-            view.add_phantom(
+            int_id = view.add_phantom(
                 id,
                 region,
                 html,
                 sublime.LAYOUT_BLOCK,
-                on_navigate=lambda href, id=id: view.erase_phantoms(id),
+                on_navigate=lambda href, id=id, view=view: self._erase_phantom(
+                    id, view=view
+                ),
             )
+            self.phantoms[id] = int_id
             self._logger.info("Created inline phantom image")
+
+    def _clear_phantoms_in_region(self, region: sublime.Region, view: sublime.View):
+        _, cell = get_cell(view, region, logger="")
+        remove = [
+            pid
+            for pid, int_id in self.phantoms.items()
+            if cell.contains(view.query_phantom(int_id)[0])
+        ]
+
+        for pid in remove:
+            self._erase_phantom(pid, view=view)
+
+    def _erase_phantom(self, pid: str, *, view: sublime.View):
+        if pid in self.phantoms:
+            _ = self.phantoms.pop(pid)
+            view.erase_phantoms(pid)
 
     def _write_mime_data_to_view(
         self, mime_data: dict, region: sublime.Region, view: sublime.View
     ) -> None:
         # Now we use basically text/plain for text type.
         # Jupyter kernels often emits html whom minihtml cannot render.
+        self._clear_phantoms_in_region(region, view)
+
         if "text/plain" in mime_data:
             content = mime_data["text/plain"]
             lines = "\n(display data): {content}".format(content=content)

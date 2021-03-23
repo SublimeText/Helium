@@ -1,8 +1,8 @@
+import bisect
 import re
 import sys
-from functools import wraps
-
 from base64 import b64decode
+from functools import wraps
 
 import sublime
 from sublime_plugin import TextCommand
@@ -108,3 +108,27 @@ def get_png_dimensions(base64):
     iwidth = int.from_bytes(wh[1:5], byteorder="big")
     iheight = int.from_bytes(wh[5:], byteorder="big")
     return (iwidth, iheight)
+
+
+def get_cell(
+    view: sublime.View, region: sublime.Region, *, logger: str
+) -> (str, sublime.Region):
+    """Get the code cell under the cursor.
+
+    Cells are separated by markers.
+    Those are defined in `cell_delimiter_pattern` in the config file.
+
+    If `s` is a selected region, the code cell is it.
+    """
+    if not region.empty():
+        return (view.substr(region), region)
+    cell_delimiter_pattern = sublime.load_settings("Helium.sublime-settings").get(
+        "cell_delimiter_pattern"
+    )
+    separators = view.find_all(cell_delimiter_pattern)
+    separators.append(sublime.Region(view.size() + 2, view.size() + 2))
+    r = sublime.Region(region.begin() + 1, region.begin() + 1)
+    start_point = separators[bisect.bisect(separators, r) - 1].end() + 1
+    end_point = separators[bisect.bisect(separators, r)].begin() - 1
+    cell_region = sublime.Region(start_point, end_point)
+    return (view.substr(cell_region), cell_region)
