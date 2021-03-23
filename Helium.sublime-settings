@@ -5,10 +5,26 @@
   // #%%
   // # %%
   // # <codecell>
-  "complete": true,  // Whether use Helium' autocomplete powered by Jupyter kernel.
-  "complete_timeout": 0.5, // Timeout to get completion (in seconds).
-  "inline_output": false, // Set to true to show output in current view, like Jupyter
-  "output_code": false, // Set true to show the executed code in the output
+
+  // Whether use Helium' autocomplete powered by Jupyter kernel.
+  "complete": true,
+
+  // Timeout to get completion (in seconds).
+  "complete_timeout": 0.5,
+
+  // Set to true to show output in current view, like Jupyter
+  "inline_output": false,
+
+  // Set true to show the executed code in the output
+  "output_code": false,
+
+  // "image_size" controls the size of the image. It can take one three values:
+  //     "original":         The image is displayed with its original size.
+  //     "resize_to_window": The image is rescaled to match the size of the window.
+  //     "optimal":          The image is either resized or has its original size,
+  //                         whichever is smaller.
+  // The default is "optimal".
+  "image_size": "resize_to_window",
 
   // If you use kernels located in the directory other than default search path
   // (see http://jupyter-client.readthedocs.io/en/stable/kernels.html#kernel-specs),
