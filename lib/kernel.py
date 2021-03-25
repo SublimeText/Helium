@@ -458,16 +458,6 @@ class KernelConnection(object):
 
                 html = IMAGE_PHANTOM.format(data=data, width=width, height=height)
 
-            if dimensions[0] < width:
-                html = IMAGE_PHANTOM.format(
-                    data=data, width=dimensions[0], height=dimensions[1]
-                )
-            else:
-                scale_factor = width / dimensions[0]
-                height = dimensions[1] * scale_factor
-
-                html = IMAGE_PHANTOM.format(data=data, width=width, height=height)
-
             int_id = view.add_phantom(
                 id,
                 region,
