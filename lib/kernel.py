@@ -246,7 +246,7 @@ class KernelConnection(object):
     ):
         """Initialize KernelConnection class.
 
-        paramters
+        parameters
         ---------
         kernel_id str: kernel ID
         parent parent kernel manager
@@ -439,9 +439,24 @@ class KernelConnection(object):
     ):
         if self._show_inline_output:
             id = HELIUM_FIGURE_PHANTOMS + datetime.now().isoformat()
+            img_size = sublime.load_settings("Helium.sublime-settings").get(
+                "image_size", "optimal"
+            )
 
             width = view.viewport_extent()[0] - 2
             dimensions = get_png_dimensions(data)
+
+            if img_size == "original" or (
+                img_size == "optimal" and (dimensions[0] < width)
+            ):
+                html = IMAGE_PHANTOM.format(
+                    data=data, width=dimensions[0], height=dimensions[1]
+                )
+            else:
+                scale_factor = width / dimensions[0]
+                height = dimensions[1] * scale_factor
+
+                html = IMAGE_PHANTOM.format(data=data, width=width, height=height)
 
             if dimensions[0] < width:
                 html = IMAGE_PHANTOM.format(
@@ -506,12 +521,21 @@ class KernelConnection(object):
         if "image/png" in mime_data:
             data = mime_data["image/png"].strip()
 
+            img_size = sublime.load_settings("Helium.sublime-settings").get(
+                "image_size", "optimal"
+            )
+
             self._logger.info(self.get_view().viewport_extent())
             width = self.get_view().viewport_extent()[0] - 2
             dimensions = get_png_dimensions(data)
 
-            scale_factor = width / dimensions[0]
-            height = dimensions[1] * scale_factor
+            if img_size == "original" or (
+                img_size == "optimal" and (dimensions[0] < width)
+            ):
+                width, height = dimensions
+            else:
+                scale_factor = width / dimensions[0]
+                height = dimensions[1] * scale_factor
 
             content = (
                 '<body style="background-color:white">'
