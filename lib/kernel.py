@@ -147,7 +147,6 @@ class KernelConnection(object):
         def run(self):
             """Run main routine."""
             # TODO: log, handle other message types.
-            prev_msg_type = ""
 
             while not self.exit.is_set():
                 try:
@@ -160,21 +159,12 @@ class KernelConnection(object):
                         msg["parent_header"].get("msg_id", None), (None, None)
                     )
 
-                    # clear phantoms if input was executed and should be displayed
-                    output_msgs = (
-                        MSG_TYPE_DISPLAY_DATA,
-                        MSG_TYPE_ERROR,
-                        MSG_TYPE_EXECUTE_RESULT,
-                        MSG_TYPE_STREAM,
-                    )
-                    if prev_msg_type == MSG_TYPE_EXECUTE_INPUT and (
-                        msg_type in output_msgs
-                    ):
-                        self._kernel._clear_phantoms_in_region(region, view)
-
                     if msg_type == MSG_TYPE_STATUS:
                         self._kernel._execution_state = content["execution_state"]
                     elif msg_type == MSG_TYPE_EXECUTE_INPUT:
+                        # if code is executed deleted all phantoms in this region
+                        self._kernel._clear_phantoms_in_region(region, view)
+
                         self._kernel._write_text_to_view("\n\n")
                         if sublime.load_settings("Helium.sublime-settings").get(
                             "output_code"
@@ -203,7 +193,7 @@ class KernelConnection(object):
                         self._kernel._handle_stream(
                             content["name"], content["text"], region, view,
                         )
-                    prev_msg_type = msg_type
+
                 except Empty:
                     pass
                 except Exception as ex:
@@ -401,7 +391,7 @@ class KernelConnection(object):
             pass
 
     def _write_out_execution_count(self, execution_count) -> None:
-        self._write_text_to_view("\nOut[{}]: ".format(execution_count))
+        self._write_text_to_view("\nOut[{}]: \n".format(execution_count))
 
     def _write_text_to_view(self, text: str) -> None:
         if self._show_inline_output:
