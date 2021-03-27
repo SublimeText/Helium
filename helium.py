@@ -16,7 +16,7 @@ from os.path import expanduser
 import sublime
 from sublime_plugin import EventListener, TextCommand, ViewEventListener
 
-from .lib.kernel import KernelConnection
+from .lib.kernel import MAX_PHANTOMS, KernelConnection
 from .lib.utils import add_path, chain_callbacks, get_cell
 
 with add_path(os.path.join(os.path.dirname(__file__), "lib/client")):
@@ -334,6 +334,7 @@ class HeliumStartKernel(TextCommand):
     def run(self, edit, *, logger=HELIUM_LOGGER):
         """Command definition."""
         _start_kernel(sublime.active_window(), self.view)
+        self.view.run_command("helium_clear_all_cells")
 
 
 # TODO: Make this an enum
@@ -482,6 +483,7 @@ class HeliumConnectKernel(TextCommand):
     def run(self, edit, *, logger=HELIUM_LOGGER):
         """Command definition."""
         _connect_kernel(sublime.active_window(), self.view, logger=logger)
+        self.view.run_command("helium_clear_all_cells")
 
 
 @chain_callbacks
@@ -574,6 +576,7 @@ class HeliumRestartKernel(TextCommand):
     def run(self, edit, *, logger=HELIUM_LOGGER):
         """Command definition."""
         _restart_kernel(sublime.active_window(), self.view, logger=logger)
+        self.view.run_command("helium_clear_all_cells")
 
 
 @chain_callbacks
@@ -799,6 +802,56 @@ class HeliumExecuteCell(TextCommand):
             # TODO: scroll to cursor after phantoms after Jupyter callback
             # rather than fixed time
             sublime.set_timeout(lambda: self.view.show(pt), 500)
+
+
+class HeliumClearAllCells(TextCommand):
+    """Clear all phantoms"""
+
+    def is_enabled(self, *, logger=HELIUM_LOGGER):
+        try:
+            kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
+
+            # if view has an attached kernel, return its status
+            return kernel.is_alive()
+        except KeyError:
+            # if view doesn't have an attached kernel, check if view was created by
+            # kernel
+            parent_view = self._get_parent_view()
+            return parent_view is not None
+
+    def is_visible(self, *, logger=HELIUM_LOGGER):
+        return self.is_enabled()
+
+    def run(self, edit, *, logger=HELIUM_LOGGER):
+        # get correct kernel
+        try:
+            kernel = ViewManager.get_kernel_for_view(self.view.buffer_id())
+        except KeyError:
+            view = self._get_parent_view()
+            kernel = ViewManager.get_kernel_for_view(view.buffer_id())
+
+        def cb():
+            if kernel._show_inline_output:
+                for k in range(MAX_PHANTOMS):
+                    self.view.erase_phantom_by_id(k)
+            else:
+                kernel.get_view().close()
+                kernel.activate_view()
+
+        # clear the old phantoms async
+        sublime.set_timeout_async(cb, 0)
+
+    def _get_parent_view(self) -> sublime.View:
+        for window in sublime.windows():
+            for view in window.views():
+                try:
+                    kernel = ViewManager.get_kernel_for_view(view.buffer_id())
+                except KeyError:
+                    continue
+
+                if kernel.get_view() == self.view:
+                    return view
+        return None
 
 
 class StatusBar(object):

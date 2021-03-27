@@ -36,6 +36,7 @@ MSG_TYPE_STREAM = "stream"
 MSG_TYPE_STATUS = "status"
 
 HELIUM_FIGURE_PHANTOMS = "helium_figure_phantoms"
+MAX_PHANTOMS = 65536
 
 # Used as key of status bar.
 KERNEL_STATUS_KEY = "helium_kernel_status"
@@ -422,17 +423,7 @@ class KernelConnection(object):
             id = HELIUM_FIGURE_PHANTOMS + datetime.now().isoformat()
 
             html = TEXT_PHANTOM.format(content=content)
-            int_id = view.add_phantom(
-                id,
-                region,
-                html,
-                sublime.LAYOUT_BLOCK,
-                on_navigate=lambda href, id=id, view=view: self._erase_phantom(
-                    id, view=view
-                ),
-            )
-            self.phantoms[id] = int_id
-            self._logger.info("Created inline phantom {}".format(html))
+            self._add_phantom(view, id, region, html)
 
     def _write_inline_image_phantom(
         self, data: str, region: sublime.Region, view: sublime.View
@@ -458,17 +449,28 @@ class KernelConnection(object):
 
                 html = IMAGE_PHANTOM.format(data=data, width=width, height=height)
 
-            int_id = view.add_phantom(
-                id,
-                region,
-                html,
-                sublime.LAYOUT_BLOCK,
-                on_navigate=lambda href, id=id, view=view: self._erase_phantom(
-                    id, view=view
-                ),
+            self._add_phantom(view, id, region, html)
+
+    def _add_phantom(
+        self, view: sublime.View, id: str, region: sublime.Region, html: str
+    ):
+        int_id = view.add_phantom(
+            id,
+            region,
+            html,
+            sublime.LAYOUT_BLOCK,
+            on_navigate=lambda href, id=id, view=view: self._erase_phantom(
+                id, view=view
+            ),
+        )
+        self.phantoms[id] = int_id
+
+        if int_id > MAX_PHANTOMS:
+            sublime.message_dialog(
+                "Please close and reopen your current tab. "
+                + "Otherwise the 'Clear All Cells' command might not work as intended."
             )
-            self.phantoms[id] = int_id
-            self._logger.info("Created inline phantom image")
+        self._logger.info("Created inline phantom image")
 
     def _clear_phantoms_in_region(self, region: sublime.Region, view: sublime.View):
         _, cell = get_cell(view, region, logger="")
