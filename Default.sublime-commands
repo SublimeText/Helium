@@ -43,6 +43,10 @@
     "command": "helium_get_object_inspection"
   },
   {
+    "caption": "Helium: Clear All Cells",
+    "command": "helium_clear_all_cells"
+  },
+  {
     "caption": "Helium: Settings",
     "command": "edit_settings", "args":
     {
