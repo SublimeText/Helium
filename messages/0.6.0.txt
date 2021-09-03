@@ -1,0 +1,14 @@
+Update in 0.6.0
+---------------
+
+This release adds many quality of life features and fixes some bugs:
+
+- control the size of inline plots
+- transparent background for images
+- move the cursor after executing cell is the new default
+- selects the correct cell for execution
+- bugfixes
+
+Altogether, Helium should feel much smoother to use.
+
+If you have any issues, please report them on [github/issues](https://github.com/sschuhmann/Helium/issues)
