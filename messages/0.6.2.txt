@@ -1,0 +1,4 @@
+Update 0.6.2
+------------
+
+- fixed a bug where ST4 uses python 3.8 instead of python 3.3. Thanks to walterm128 for the fix.
