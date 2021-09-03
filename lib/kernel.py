@@ -58,9 +58,9 @@ TEXT_PHANTOM = """<body id="helium-result">
   {content}
 </body>"""
 
-IMAGE_PHANTOM = """<body id="helium-image-result" style="background-color:white">
+IMAGE_PHANTOM = """<body id="helium-image-result" style="background-color:none">
   <style>
-    .image {{ background-color: white }}
+    .image {{ background-color: none }}
     .closebutton {{ text-decoration: none }}
   </style>
   <a class=closebutton href=hide>×</a>
@@ -192,7 +192,10 @@ class KernelConnection(object):
                         )
                     elif msg_type == MSG_TYPE_STREAM:
                         self._kernel._handle_stream(
-                            content["name"], content["text"], region, view,
+                            content["name"],
+                            content["text"],
+                            region,
+                            view,
                         )
 
                 except Empty:
@@ -243,7 +246,12 @@ class KernelConnection(object):
         self._stdin_msg_receiver.start()
 
     def __init__(
-        self, kernel_id, kernel_manager, parent, connection_name=None, logger=None,
+        self,
+        kernel_id,
+        kernel_manager,
+        parent,
+        connection_name=None,
+        logger=None,
     ):
         """Initialize KernelConnection class.
 
@@ -362,7 +370,9 @@ class KernelConnection(object):
         try:
             lines = """\nError: {ename}, {evalue}.
             \nTraceback:\n{traceback}""".format(
-                ename=ename, evalue=evalue, traceback="\n".join(traceback),
+                ename=ename,
+                evalue=evalue,
+                traceback="\n".join(traceback),
             )
             lines = remove_ansi_escape(lines)
             self._write_text_to_view(lines)
@@ -530,7 +540,7 @@ class KernelConnection(object):
                 height = dimensions[1] * scale_factor
 
             content = (
-                '<body style="background-color:white">'
+                '<body style="background-color: none">'
                 '<img alt="Out" style="width: {width}; height: {height}" src="data:image/png;base64,{data}" />'
                 + "</body>"
             ).format(data=data, width=width, height=height, bgcolor="white")
