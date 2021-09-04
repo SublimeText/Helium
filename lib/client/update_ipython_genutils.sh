@@ -25,13 +25,15 @@ cd /tmp/ipython_genutils
 git checkout $1
 cd $cur_path
 
-git_status=`git status -- ipython_genutils`
-git_clean=$(echo -e "On branch update_libraries\nnothing to commit, working tree clean\n")
+git_status=`git status -- jupyter_core | tail -n 1`
+git_clean="nothing to commit, working tree clean"
 
 if [[ $git_status == $git_clean ]]; then
     rm -rf ipython_genutils/
     mv /tmp/ipython_genutils/ipython_genutils .
-    echo $1 > ipython_genutils/version
+
+    rm -rf ipython_genutils/testing
+    rm -rf ipython_genutils/tests
 else
     echo ""
     echo -e "${red}ERROR"
