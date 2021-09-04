@@ -25,13 +25,14 @@ cd /tmp/jupyter_core
 git checkout $1
 cd $cur_path
 
-git_status=`git status -- jupyter_core`
-git_clean=$(echo -e "On branch update_libraries\nnothing to commit, working tree clean\n")
+git_status=`git status -- jupyter_core | tail -n 1`
+git_clean="nothing to commit, working tree clean"
 
 if [[ $git_status == $git_clean ]]; then
     rm -rf jupyter_core/
     mv /tmp/jupyter_core/jupyter_core .
-    echo $1 > jupyter_core/version
+
+    rm -rf jupyter_core/tests
 else
     echo ""
     echo -e "${red}ERROR"
