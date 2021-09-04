@@ -25,7 +25,7 @@ def as_zmqstream(f):
 
 class IOLoopKernelManager(KernelManager):
 
-    loop = Instance('zmq.eventloop.ioloop.ZMQIOLoop')
+    loop = Instance('tornado.ioloop.IOLoop')
     def _loop_default(self):
         return ioloop.IOLoop.current()
 
