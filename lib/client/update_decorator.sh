@@ -25,8 +25,8 @@ cd /tmp/decorator
 git checkout $1
 cd $cur_path
 
-git_status=`git status -- decorator`
-git_clean=$(echo -e "On branch update_libraries\nnothing to commit, working tree clean\n")
+git_status=`git status -- decorator | tail -n 1`
+git_clean="nothing to commit, working tree clean"
 
 if [[ $git_status == $git_clean ]]; then
     rm -rf decorator/

@@ -25,7 +25,7 @@ cd /tmp/ipython_genutils
 git checkout $1
 cd $cur_path
 
-git_status=`git status -- jupyter_core | tail -n 1`
+git_status=`git status -- ipython_genutils | tail -n 1`
 git_clean="nothing to commit, working tree clean"
 
 if [[ $git_status == $git_clean ]]; then
