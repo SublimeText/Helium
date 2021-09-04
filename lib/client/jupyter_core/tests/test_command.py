@@ -3,6 +3,7 @@
 import json
 import os
 import sys
+import sysconfig
 from subprocess import check_output, CalledProcessError
 
 import pytest
@@ -108,17 +109,27 @@ def test_subcommand_list(tmpdir):
                 'jupyterstuff',
                 'jupyter-yo-eyropa-ganymyde-callysto'):
         b.join(cmd).write('')
+    c = tmpdir.mkdir("c")
+    for cmd in ('jupyter-baz',
+                'jupyter-bop'):
+        c.join(cmd).write('')
     
     path = os.pathsep.join(map(str, [a, b]))
+
+    def get_path(dummy):
+        return str(c)
     
-    with patch.dict('os.environ', {'PATH': path}):
-        subcommands = list_subcommands()
-        assert subcommands == [
-            'babel-fish',
-            'foo',
-            'xyz',
-            'yo-eyropa-ganymyde-callysto',
-        ]
+    with patch.object(sysconfig, 'get_path', get_path):
+        with patch.dict('os.environ', {'PATH': path}):
+            subcommands = list_subcommands()
+            assert subcommands == [
+                'babel-fish',
+                'baz',
+                'bop',
+                'foo',
+                'xyz',
+                'yo-eyropa-ganymyde-callysto',
+            ]
 
 def test_not_on_path(tmpdir):
     a = tmpdir.mkdir("a")

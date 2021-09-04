@@ -29,7 +29,7 @@ except NameError:
 
 from traitlets.config.application import Application, catch_config_error
 from traitlets.config.loader import ConfigFileNotFound
-from traitlets import Unicode, Bool, List
+from traitlets import Unicode, Bool, List, observe
 
 from .utils import ensure_dir_exists
 from ipython_genutils import py3compat
@@ -65,7 +65,7 @@ class JupyterApp(Application):
     
     aliases = base_aliases
     flags = base_flags
-    
+
     def _log_level_default(self):
         return logging.INFO
     
@@ -98,10 +98,11 @@ class JupyterApp(Application):
         rd = jupyter_runtime_dir()
         ensure_dir_exists(rd, mode=0o700)
         return rd
-    
-    def _runtime_dir_changed(self, new):
-        ensure_dir_exists(new, mode=0o700)
-    
+
+    @observe('runtime_dir')
+    def _runtime_dir_changed(self, change):
+        ensure_dir_exists(change['new'], mode=0o700)
+
     generate_config = Bool(False, config=True,
         help="""Generate default config file."""
     )
@@ -203,10 +204,11 @@ class JupyterApp(Application):
         except ConfigFileNotFound:
             self.log.debug("Config file not found, skipping: %s", config_file_name)
         except Exception:
-            # For testing purposes.
-            if not suppress_errors:
+            # Reraise errors for testing purposes, or if set in
+            # self.raise_config_file_errors
+            if (not suppress_errors) or self.raise_config_file_errors:
                 raise
-            self.log.warn("Error loading config file: %s" %
+            self.log.warning("Error loading config file: %s" %
                             config_file_name, exc_info=True)
 
     # subcommand-related
