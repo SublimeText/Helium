@@ -25,13 +25,15 @@ cd /tmp/traitlets
 git checkout $1
 cd $cur_path
 
-git_status=`git status -- traitlets`
-git_clean=$(echo -e "On branch update_libraries\nnothing to commit, working tree clean\n")
+git_status=`git status -- traitlets | tail -n 1`
+git_clean="nothing to commit, working tree clean"
 
 if [[ $git_status == $git_clean ]]; then
     rm -rf traitlets/
     mv /tmp/traitlets/traitlets .
-    echo $1 > traitlets/version
+
+    rm -rf traitlets/tests
+    rm -rf traitlets/config/tests
 else
     echo ""
     echo -e "${red}ERROR"
