@@ -805,7 +805,7 @@ class HeliumExecuteCell(TextCommand):
 
 
 class HeliumClearAllCells(TextCommand):
-    """Clear all phantoms"""
+    """Clear all phantoms."""
 
     def is_enabled(self, *, logger=HELIUM_LOGGER):
         try:
@@ -978,5 +978,5 @@ class HeliumCompleter(EventListener):
             logger.info(log_info_msg)
             _, col = view.rowcol(location)
             return kernel.get_complete(code, col, timeout)
-        except Exception:
+        except Exception:  # noqa
             return None
