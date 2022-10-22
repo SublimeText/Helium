@@ -1,0 +1,4 @@
+Update 0.6.2
+------------
+
+- updated internal packages
