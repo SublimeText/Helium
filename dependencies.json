@@ -14,7 +14,8 @@
 			"pexpect",
 			"ptyprocess",
 			"python-six",
-			"pyzmq"
+			"pyzmq",
+			"tornado"
 		]
 	},
 	"linux": {
@@ -24,7 +25,8 @@
 			"pexpect",
 			"ptyprocess",
 			"python-six",
-			"pyzmq"
+			"pyzmq",
+			"tornado"
 		]
 	}
 }
