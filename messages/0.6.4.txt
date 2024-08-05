@@ -1,0 +1,4 @@
+Update in 0.6.4
+---------------
+
+- add support for ST4

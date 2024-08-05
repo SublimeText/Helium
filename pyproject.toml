@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "Helium"
-version = "0.6.0"
+version = "0.6.4"
 description = "Let Sublime Text 3 talk with Jupyter."
 authors = ["Ben Felder <ben@felder.io>"]
 repository = "https://github.com/pykong/Helium"
