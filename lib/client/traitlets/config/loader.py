@@ -542,7 +542,7 @@ kv_pattern = re.compile(r'\-\-[A-Za-z][\w\-]*(\.[\w\-]+)*\=.*')
 # rejects:  --anything=anything
 #           --two.word
 
-flag_pattern = re.compile(r'\-\-?\w+[\-\w]*$')
+flag_pattern = re.compile(r'\-\-?\w[\-\w]*$')
 
 class KeyValueConfigLoader(CommandLineConfigLoader):
     """A config loader that loads key value pairs from the command line.
@@ -669,7 +669,7 @@ class KeyValueConfigLoader(CommandLineConfigLoader):
 
             elif flag_pattern.match(raw):
                 if item in flags:
-                    cfg,help = flags[item]
+                    cfg,_ = flags[item]
                     self._load_flag(cfg)
                 else:
                     raise ArgumentError("Unrecognized flag: '%s'"%raw)
@@ -792,7 +792,7 @@ class KVArgParseConfigLoader(ArgParseConfigLoader):
                 nargs = '?'
             else:
                 nargs = None
-            if len(key) is 1:
+            if len(key) == 1:
                 paa('-'+key, '--'+key, type=text_type, dest=value, nargs=nargs)
             else:
                 paa('--'+key, type=text_type, dest=value, nargs=nargs)
@@ -801,7 +801,7 @@ class KVArgParseConfigLoader(ArgParseConfigLoader):
                 #
                 self.alias_flags[self.aliases[key]] = value
                 continue
-            if len(key) is 1:
+            if len(key) == 1:
                 paa('-'+key, '--'+key, action='append_const', dest='_flags', const=value)
             else:
                 paa('--'+key, action='append_const', dest='_flags', const=value)
